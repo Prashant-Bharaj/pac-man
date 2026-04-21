@@ -1,4 +1,4 @@
-*This project has been created as part of the 42 curriculum by prashant-bharaj.*
+*This project has been created as part of the 42 curriculum by prasingh and msantos2.*
 
 # Pac-Man — Ghosts! More ghosts!
 
