@@ -1,0 +1,50 @@
+# Project docs (PDF subject file)
+docs/
+
+# uv
+.venv/
+uv.lock
+
+# Python artifacts
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+.Python
+*.egg
+*.egg-info/
+
+# Build & packaging
+dist/
+build/
+.eggs/
+*.spec.bak
+*.manifest
+
+# Virtual environments (non-uv)
+venv/
+env/
+ENV/
+
+# Mypy
+.mypy_cache/
+
+# Pytest
+.pytest_cache/
+htmlcov/
+.coverage
+coverage.xml
+
+# Editor
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Game runtime files
+highscores.json

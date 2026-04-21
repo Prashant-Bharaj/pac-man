@@ -1,0 +1,1 @@
+"""Pac-Man test suite."""

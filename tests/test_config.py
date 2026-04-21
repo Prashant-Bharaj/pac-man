@@ -1,0 +1,90 @@
+"""Tests for the config loader."""
+
+import json
+from pathlib import Path
+
+from src.config import load_config, GameConfig
+
+
+def write_config(tmp_path: Path, content: str) -> str:
+    """Write a config file and return its path."""
+    p = tmp_path / "config.json"
+    p.write_text(content)
+    return str(p)
+
+
+def test_valid_config(tmp_path: Path) -> None:
+    """A well-formed config loads all keys correctly."""
+    data = {
+        "lives": 5,
+        "points_per_pacgum": 20,
+        "points_per_super_pacgum": 100,
+        "points_per_ghost": 400,
+        "seed": 7,
+        "level_max_time": 60,
+        "highscore_filename": "scores.json",
+        "levels": [{"width": 15, "height": 15, "seed": 7}],
+    }
+    path = write_config(tmp_path, json.dumps(data))
+    cfg = load_config(path)
+    assert cfg.lives == 5
+    assert cfg.points_per_pacgum == 20
+    assert cfg.seed == 7
+    assert cfg.highscore_filename == "scores.json"
+    assert len(cfg.levels) == 1
+    assert cfg.levels[0].width == 15
+
+
+def test_missing_file() -> None:
+    """A missing config file returns default config without raising."""
+    cfg = load_config("/nonexistent/path/config.json")
+    assert isinstance(cfg, GameConfig)
+    assert cfg.lives == 3
+    assert len(cfg.levels) == 10
+
+
+def test_invalid_json(tmp_path: Path) -> None:
+    """A corrupt JSON file returns default config without raising."""
+    path = write_config(tmp_path, "{ this is not json }")
+    cfg = load_config(path)
+    assert isinstance(cfg, GameConfig)
+    assert cfg.lives == 3
+
+
+def test_comment_stripping(tmp_path: Path) -> None:
+    """Lines starting with # are stripped before JSON parsing."""
+    content = '# This is a comment\n{"lives": 4}'
+    path = write_config(tmp_path, content)
+    cfg = load_config(path)
+    assert cfg.lives == 4
+
+
+def test_unknown_keys_ignored(tmp_path: Path) -> None:
+    """Unknown config keys do not cause errors."""
+    data = {"lives": 2, "unknown_key_xyz": "ignore_me"}
+    path = write_config(tmp_path, json.dumps(data))
+    cfg = load_config(path)
+    assert cfg.lives == 2
+
+
+def test_invalid_lives_clamped(tmp_path: Path) -> None:
+    """Out-of-range lives value is clamped to safe bounds."""
+    path = write_config(tmp_path, '{"lives": -5}')
+    cfg = load_config(path)
+    assert cfg.lives >= 1
+
+
+def test_empty_levels_uses_defaults(tmp_path: Path) -> None:
+    """An empty levels array falls back to 10 default levels."""
+    path = write_config(tmp_path, '{"levels": []}')
+    cfg = load_config(path)
+    assert len(cfg.levels) == 10
+
+
+def test_missing_keys_use_defaults(tmp_path: Path) -> None:
+    """Config with no keys at all uses all defaults."""
+    path = write_config(tmp_path, '{}')
+    cfg = load_config(path)
+    assert cfg.lives == 3
+    assert cfg.points_per_pacgum == 10
+    assert cfg.points_per_ghost == 200
