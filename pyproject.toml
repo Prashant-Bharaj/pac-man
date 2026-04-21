@@ -3,6 +3,7 @@ name = "pac-man"
 version = "0.1.0"
 requires-python = ">=3.10"
 dependencies = [
+    "pydantic>=2.13.3",
     "pygame>=2.5.0",
 ]
 
