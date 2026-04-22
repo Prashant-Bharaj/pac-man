@@ -209,6 +209,7 @@ class GameConfig(BaseModel):
             return [{}] * 10
         return v
 
+
 def load_config(path: str) -> GameConfig:
     """Load and validate a game config file.
 

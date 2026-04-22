@@ -232,7 +232,10 @@ class Ghost:
         if self.ghost_id >= 2:
             self._move_wander(maze, player_x, player_y)
             return
-        target = (player_x, player_y) if self.ghost_id == 0 else (player_x + 2, player_y + 2)
+        target = (
+            (player_x, player_y) if self.ghost_id == 0
+            else (player_x + 2, player_y + 2)
+        )
         step = self._bfs_next_step(maze, *target)
         if step:
             self.x, self.y = step
