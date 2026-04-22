@@ -205,7 +205,7 @@ The project uses both, each where it fits best.
 | 7 | Highscore system — persistent top-10 JSON storage | ✅ |
 | 8 | Cheat mode — all 5 keys wired, HUD display | ✅ |
 | 9 | Packaging & deployment — PyInstaller + Itch.io | pending |
-| 10 | Project management documents | pending |
+| 10 | Project management documents | ✅ |
 
 ### Game state machine
 
@@ -257,7 +257,7 @@ pac-man.py                  # Entry point — parses args, loads config, starts 
 
 ## Project Management
 
-Project management documents (timeline, risk analysis, progress tracking, test plan) are maintained in the [`management/`](management/) directory.
+Project management documents (timeline, risk analysis, progress tracking, team organization, and test plan) are maintained in the [`management/`](management/) directory. They provide a detailed look into our collaborative process and architectural decisions.
 
 ---
 

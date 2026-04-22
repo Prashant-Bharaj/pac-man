@@ -1,6 +1,7 @@
 """Level setup, update loop, and collision detection."""
 
 import logging
+import random
 from dataclasses import dataclass, field
 from enum import Enum, auto
 
@@ -57,9 +58,13 @@ class Level:
     def __post_init__(self) -> None:
         """Build maze and place all entities."""
         self.time_remaining = float(self.config.level_max_time)
-        # Use config seed for level 0; subsequent levels use index-based seeds
-        # to guarantee distinct mazes when all levels share the default seed.
-        seed = self.level_cfg.seed if self.index == 0 else self.index + 1
+        # Use config seed for level 0; subsequent levels use random seeds
+        # to ensure a unique experience on every playthrough.
+        if self.index == 0:
+            seed = self.level_cfg.seed
+        else:
+            seed = random.randint(0, 2**31 - 1)
+
         self.grid = generate_maze(
             self.level_cfg.width,
             self.level_cfg.height,
