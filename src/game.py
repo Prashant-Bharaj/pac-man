@@ -10,20 +10,18 @@ from src.config import GameConfig, LevelConfig
 from src.entities.player import Direction
 from src.highscore import add_entry, load, save
 from src.level import Level, LevelEvent
-from src.maze import CellType
+from src.renderer import Renderer
+from src.ui.gameover import GameOverScreen
+from src.ui.hud import HUD
+from src.ui.menu import MainMenu
+from src.ui.pause import PauseMenu
+from src.ui.victory import VictoryScreen
 
 logger = logging.getLogger(__name__)
 
 TARGET_FPS: int = 60
 CELL_SIZE: int = 16
 HUD_HEIGHT: int = 48
-
-_GHOST_COLORS: list[tuple[int, int, int]] = [
-    (255, 0, 0),
-    (255, 184, 255),
-    (0, 255, 255),
-    (255, 184, 82),
-]
 
 
 class GameState(Enum):
@@ -34,7 +32,6 @@ class GameState(Enum):
     PAUSED = auto()
     GAME_OVER = auto()
     VICTORY = auto()
-    NAME_ENTRY = auto()
     QUIT = auto()
 
 
@@ -53,10 +50,17 @@ class Game:
         self.level_index: int = 0
         self.level: Level | None = None
         self._pending_score: int = 0
-        self._name_entry_buffer: str = ""
+        self._name_buf: str = ""
+        self._tick: int = 0
         self._highscores = load(config.highscore_filename)
         self._screen: pygame.Surface | None = None
-        self._font_cache: dict[int, pygame.font.Font] = {}
+        # UI objects — no pygame calls in __init__; safe to create here
+        self._renderer = Renderer(800, 600, CELL_SIZE)
+        self._menu = MainMenu()
+        self._hud = HUD()
+        self._pause = PauseMenu()
+        self._gameover = GameOverScreen()
+        self._victory = VictoryScreen()
         logger.info("Game initialised with %d levels", len(config.levels))
 
     # ------------------------------------------------------------------
@@ -66,18 +70,22 @@ class Game:
     def run(self) -> None:
         """Start and run the main game loop until the player quits."""
         pygame.init()
-        self._screen = pygame.display.set_mode((800, 600), pygame.RESIZABLE)
+        self._screen = pygame.display.set_mode(
+            (800, 600), pygame.RESIZABLE
+        )
         pygame.display.set_caption("Pac-Man")
         clock = pygame.time.Clock()
 
         while self.state != GameState.QUIT:
             dt = clock.tick(TARGET_FPS) / 1000.0
             dt = min(dt, 0.1)
+            self._tick += 1
 
             for event in pygame.event.get():
                 self._handle_event(event)
 
             if self._screen is not None:
+                self._screen.fill((0, 0, 0))
                 self._update(dt, self._screen)
                 pygame.display.flip()
 
@@ -111,13 +119,7 @@ class Game:
                 self._reset_to_menu()
 
         elif self.state in (GameState.GAME_OVER, GameState.VICTORY):
-            if key in (pygame.K_RETURN, pygame.K_SPACE):
-                self._enter_name_entry()
-            elif key == pygame.K_ESCAPE:
-                self._reset_to_menu()
-
-        elif self.state == GameState.NAME_ENTRY:
-            self._handle_name_entry_key(key)
+            self._handle_end_screen_key(key)
 
     def _handle_playing_key(self, key: int) -> None:
         if self.level is None:
@@ -144,26 +146,27 @@ class Game:
         elif key == pygame.K_n:
             self._advance_level()
 
-    def _handle_name_entry_key(self, key: int) -> None:
+    def _handle_end_screen_key(self, key: int) -> None:
+        """Handle keyboard input on the game-over / victory screens."""
         if key == pygame.K_RETURN:
-            name = self._name_entry_buffer.strip() or "PLAYER"
+            name = self._name_buf.strip() or "PLAYER"
             self._highscores = add_entry(
                 self._highscores, name, self._pending_score
             )
             save(self.config.highscore_filename, self._highscores)
             self._reset_to_menu()
         elif key == pygame.K_BACKSPACE:
-            self._name_entry_buffer = self._name_entry_buffer[:-1]
+            self._name_buf = self._name_buf[:-1]
         elif key == pygame.K_ESCAPE:
             self._reset_to_menu()
         elif key == pygame.K_SPACE:
-            if len(self._name_entry_buffer) < 10:
-                self._name_entry_buffer += " "
+            if len(self._name_buf) < 10:
+                self._name_buf += " "
         else:
             char = pygame.key.name(key)
             if len(char) == 1 and char.isalnum():
-                if len(self._name_entry_buffer) < 10:
-                    self._name_entry_buffer += char.upper()
+                if len(self._name_buf) < 10:
+                    self._name_buf += char.upper()
 
     # ------------------------------------------------------------------
     # State transitions
@@ -186,20 +189,21 @@ class Game:
             starting_lives=starting_lives,
             starting_score=starting_score,
         )
-        self._resize_window_for_level()
+        self._resize_window()
         logger.info(
-            "Loaded level %d (%dx%d maze cells)",
+            "Loaded level %d (%dx%d cells)",
             self.level_index + 1,
             self.level.grid_width,
             self.level.grid_height,
         )
 
-    def _resize_window_for_level(self) -> None:
-        if self.level is None or self._screen is None:
+    def _resize_window(self) -> None:
+        if self.level is None:
             return
         w = self.level.grid_width * CELL_SIZE
         h = self.level.grid_height * CELL_SIZE + HUD_HEIGHT
         self._screen = pygame.display.set_mode((w, h))
+        self._renderer = Renderer(w, h, CELL_SIZE)
 
     def _level_cfg(self, index: int) -> LevelConfig:
         if index < len(self.config.levels):
@@ -214,23 +218,20 @@ class Game:
         self.level_index += 1
         if self.level_index >= len(self.config.levels):
             self._pending_score = score
+            self._name_buf = ""
             self.state = GameState.VICTORY
         else:
             self._load_level(starting_lives=lives, starting_score=score)
             self.state = GameState.PLAYING
 
-    def _enter_name_entry(self) -> None:
-        self._name_entry_buffer = ""
-        self.state = GameState.NAME_ENTRY
-
     def _reset_to_menu(self) -> None:
         self.level = None
         self.level_index = 0
         self.cheat = CheatMode()
-        if self._screen is not None:
-            self._screen = pygame.display.set_mode(
-                (800, 600), pygame.RESIZABLE
-            )
+        self._screen = pygame.display.set_mode(
+            (800, 600), pygame.RESIZABLE
+        )
+        self._renderer = Renderer(800, 600, CELL_SIZE)
         self.state = GameState.MAIN_MENU
 
     # ------------------------------------------------------------------
@@ -238,20 +239,32 @@ class Game:
     # ------------------------------------------------------------------
 
     def _update(self, dt: float, screen: pygame.Surface) -> None:
-        screen.fill((0, 0, 0))
-
         if self.state == GameState.MAIN_MENU:
-            self._draw_main_menu(screen)
+            self._menu.render(screen, self._highscores)
+
         elif self.state == GameState.PLAYING:
             self._update_playing(dt, screen)
+
         elif self.state == GameState.PAUSED:
-            self._draw_paused(screen)
+            if self.level is not None:
+                self._renderer.draw_level(screen, self.level, self._tick)
+                hud_y = self.level.grid_height * CELL_SIZE
+                self._hud.render(
+                    screen,
+                    self.level.player.score,
+                    self.level.player.lives,
+                    self.level_index + 1,
+                    self.level.time_remaining,
+                    self.cheat.active_cheats,
+                    hud_y,
+                )
+            self._pause.render(screen)
+
         elif self.state == GameState.GAME_OVER:
-            self._draw_game_over(screen)
+            self._gameover.render(screen, self._pending_score, self._name_buf)
+
         elif self.state == GameState.VICTORY:
-            self._draw_victory(screen)
-        elif self.state == GameState.NAME_ENTRY:
-            self._draw_name_entry(screen)
+            self._victory.render(screen, self._pending_score, self._name_buf)
 
     def _update_playing(self, dt: float, screen: pygame.Surface) -> None:
         if self.level is None:
@@ -270,10 +283,11 @@ class Game:
                 self.level.player.add_score(self.config.points_per_ghost)
             elif event == LevelEvent.PLAYER_HIT:
                 logger.info(
-                    "Player hit — lives remaining: %d", self.level.player.lives
+                    "Player hit — lives: %d", self.level.player.lives
                 )
             elif event == LevelEvent.GAME_OVER:
                 self._pending_score = self.level.player.score
+                self._name_buf = ""
                 self.state = GameState.GAME_OVER
                 return
             elif event == LevelEvent.LEVEL_COMPLETE:
@@ -281,180 +295,18 @@ class Game:
                 return
             elif event == LevelEvent.TIMEOUT:
                 self._pending_score = self.level.player.score
+                self._name_buf = ""
                 self.state = GameState.GAME_OVER
                 return
 
-        self._draw_level(screen)
-
-    # ------------------------------------------------------------------
-    # Drawing helpers
-    # ------------------------------------------------------------------
-
-    def _font(self, size: int = 24) -> pygame.font.Font:
-        if size not in self._font_cache:
-            self._font_cache[size] = pygame.font.SysFont("monospace", size)
-        return self._font_cache[size]
-
-    def _text(
-        self,
-        screen: pygame.Surface,
-        text: str,
-        x: int,
-        y: int,
-        color: tuple[int, int, int] = (255, 255, 255),
-        size: int = 22,
-    ) -> None:
-        surf = self._font(size).render(text, True, color)
-        screen.blit(surf, (x, y))
-
-    def _draw_main_menu(self, screen: pygame.Surface) -> None:
-        w, h = screen.get_size()
-        self._text(screen, "PAC-MAN", w // 2 - 80, h // 5, (255, 255, 0), 52)
-        self._text(
-            screen, "SPACE  - Start game", w // 2 - 130, h // 2 - 40
-        )
-        self._text(
-            screen, "ESC    - Quit", w // 2 - 130, h // 2
-        )
-        self._text(
+        self._renderer.draw_level(screen, self.level, self._tick)
+        hud_y = self.level.grid_height * CELL_SIZE
+        self._hud.render(
             screen,
-            "Cheats: I=invincible  F=freeze ghosts  S=speed  L=life  N=skip",
-            w // 2 - 260, h // 2 + 50,
-            (160, 160, 160), 17,
-        )
-        if self._highscores:
-            self._text(
-                screen, "TOP SCORES",
-                w // 2 - 70, h // 2 + 100, (255, 255, 0), 24
-            )
-            for i, entry in enumerate(self._highscores[:5]):
-                self._text(
-                    screen,
-                    f"{i + 1}. {entry.name:<10}  {entry.score:>7}",
-                    w // 2 - 110, h // 2 + 135 + i * 28,
-                    (200, 200, 200), 20,
-                )
-
-    def _draw_level(self, screen: pygame.Surface) -> None:
-        if self.level is None:
-            return
-        cs = CELL_SIZE
-
-        for row in range(self.level.grid_height):
-            for col in range(self.level.grid_width):
-                cell = self.level.grid[row][col]
-                rx, ry = col * cs, row * cs
-                if cell == CellType.WALL:
-                    pygame.draw.rect(screen, (0, 0, 180), (rx, ry, cs, cs))
-
-        for pellet in self.level.pellets:
-            if pellet.eaten:
-                continue
-            px = pellet.x * cs + cs // 2
-            py = pellet.y * cs + cs // 2
-            if pellet.is_super():
-                pygame.draw.circle(
-                    screen, (255, 200, 0), (px, py), cs // 3
-                )
-            else:
-                pygame.draw.circle(
-                    screen, (255, 200, 200), (px, py), cs // 6
-                )
-
-        for i, ghost in enumerate(self.level.ghosts):
-            if not ghost.is_active():
-                continue
-            gx = ghost.x * cs + cs // 2
-            gy = ghost.y * cs + cs // 2
-            if ghost.is_edible():
-                color: tuple[int, int, int] = (0, 80, 255)
-            else:
-                color = _GHOST_COLORS[i % len(_GHOST_COLORS)]
-            pygame.draw.circle(screen, color, (gx, gy), cs // 2 - 1)
-
-        pl = self.level.player
-        pygame.draw.circle(
-            screen,
-            (255, 255, 0),
-            (pl.x * cs + cs // 2, pl.y * cs + cs // 2),
-            cs // 2 - 1,
-        )
-
-        hud_y = self.level.grid_height * cs + 4
-        self._text(
-            screen,
-            f"Score:{pl.score:>7}  Lives:{pl.lives}  "
-            f"Level:{self.level_index + 1}  "
-            f"Time:{int(self.level.time_remaining):>3}s",
-            4, hud_y, size=17,
-        )
-        if self.cheat.active_cheats:
-            self._text(
-                screen,
-                "CHEATS: " + "  ".join(self.cheat.active_cheats),
-                4, hud_y + 22,
-                (255, 200, 0), 15,
-            )
-
-    def _draw_paused(self, screen: pygame.Surface) -> None:
-        self._draw_level(screen)
-        w, h = screen.get_size()
-        overlay = pygame.Surface((w, h), pygame.SRCALPHA)
-        overlay.fill((0, 0, 0, 150))
-        screen.blit(overlay, (0, 0))
-        self._text(
-            screen, "PAUSED", w // 2 - 70, h // 2 - 50, (255, 255, 0), 44
-        )
-        self._text(screen, "P / ESC  - Resume", w // 2 - 110, h // 2 + 10)
-        self._text(screen, "M        - Main Menu", w // 2 - 110, h // 2 + 42)
-
-    def _draw_game_over(self, screen: pygame.Surface) -> None:
-        w, h = screen.get_size()
-        self._text(
-            screen, "GAME OVER", w // 2 - 110, h // 3, (255, 60, 60), 46
-        )
-        self._text(
-            screen,
-            f"Score: {self._pending_score}",
-            w // 2 - 80, h // 3 + 70, size=28,
-        )
-        self._text(
-            screen, "ENTER / SPACE - Save score",
-            w // 2 - 150, h // 2 + 30,
-        )
-        self._text(
-            screen, "ESC - Main menu", w // 2 - 100, h // 2 + 65
-        )
-
-    def _draw_victory(self, screen: pygame.Surface) -> None:
-        w, h = screen.get_size()
-        self._text(
-            screen, "VICTORY!", w // 2 - 100, h // 3, (0, 255, 100), 46
-        )
-        self._text(
-            screen,
-            f"Final Score: {self._pending_score}",
-            w // 2 - 110, h // 3 + 70, size=28,
-        )
-        self._text(
-            screen, "ENTER / SPACE - Save score",
-            w // 2 - 150, h // 2 + 30,
-        )
-        self._text(
-            screen, "ESC - Main menu", w // 2 - 100, h // 2 + 65
-        )
-
-    def _draw_name_entry(self, screen: pygame.Surface) -> None:
-        w, h = screen.get_size()
-        self._text(
-            screen, "Enter your name:", w // 2 - 120, h // 2 - 70, size=28
-        )
-        self._text(
-            screen,
-            f"> {self._name_entry_buffer}_",
-            w // 2 - 120, h // 2, (255, 255, 0), 30,
-        )
-        self._text(
-            screen, "ENTER to confirm  ESC to cancel",
-            w // 2 - 170, h // 2 + 65, (180, 180, 180), 20,
+            self.level.player.score,
+            self.level.player.lives,
+            self.level_index + 1,
+            self.level.time_remaining,
+            self.cheat.active_cheats,
+            hud_y,
         )
