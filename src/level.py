@@ -44,7 +44,7 @@ class Level:
     index: int
     config: GameConfig
     level_cfg: LevelConfig
-    starting_lives: int = 0
+    starting_lives: int | None = None
     starting_score: int = 0
     grid: MazeGrid = field(init=False)
     grid_width: int = field(init=False)
@@ -57,6 +57,8 @@ class Level:
     def __post_init__(self) -> None:
         """Build maze and place all entities."""
         self.time_remaining = float(self.config.level_max_time)
+        # Use config seed for level 0; subsequent levels use index-based seeds
+        # to guarantee distinct mazes when all levels share the default seed.
         seed = self.level_cfg.seed if self.index == 0 else self.index + 1
         self.grid = generate_maze(
             self.level_cfg.width,
@@ -77,8 +79,7 @@ class Level:
             cx = cx + 1 if cx % 2 == 0 else cx
             cy = cy + 1 if cy % 2 == 0 else cy
 
-        default = self.config.lives
-        lives = self.starting_lives if self.starting_lives > 0 else default
+        lives = self.starting_lives if self.starting_lives is not None else self.config.lives
         self.player = Player(start_x=cx, start_y=cy, lives=lives)
         self.player.score = self.starting_score
 

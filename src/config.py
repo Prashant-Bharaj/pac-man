@@ -9,7 +9,7 @@ import json
 import logging
 from typing import Any
 
-from pydantic import BaseModel, Field, field_validator, model_validator
+from pydantic import BaseModel, Field, field_validator
 
 logger = logging.getLogger(__name__)
 
@@ -202,24 +202,12 @@ class GameConfig(BaseModel):
         Returns:
             List of level dicts (may be empty list for default handling).
         """
-        if not isinstance(v, list) or len(v) == 0:
+        if not isinstance(v, list) or not v:
             logger.warning(
                 "Config 'levels' is missing or empty, using 10 default levels"
             )
             return [{}] * 10
         return v
-
-    @model_validator(mode="after")
-    def ensure_levels(self) -> "GameConfig":
-        """Guarantee at least 10 levels exist after full model construction.
-
-        Returns:
-            Self with levels list padded to minimum 10 entries.
-        """
-        if len(self.levels) == 0:
-            self.levels = [LevelConfig() for _ in range(10)]
-        return self
-
 
 def load_config(path: str) -> GameConfig:
     """Load and validate a game config file.

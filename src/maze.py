@@ -126,7 +126,7 @@ def generate_maze(
         logger.error(
             "A-Maze-ing package not installed — using fallback maze"
         )
-    except Exception as exc:
+    except (AttributeError, IndexError, RuntimeError, ValueError) as exc:
         logger.error(
             "Maze generation failed: %s — using fallback maze", exc
         )

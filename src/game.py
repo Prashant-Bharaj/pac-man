@@ -22,6 +22,8 @@ logger = logging.getLogger(__name__)
 TARGET_FPS: int = 60
 CELL_SIZE: int = 16
 HUD_HEIGHT: int = 48
+INITIAL_WIDTH: int = 800
+INITIAL_HEIGHT: int = 600
 
 
 class GameState(Enum):
@@ -55,7 +57,7 @@ class Game:
         self._highscores = load(config.highscore_filename)
         self._screen: pygame.Surface | None = None
         # UI objects — no pygame calls in __init__; safe to create here
-        self._renderer = Renderer(800, 600, CELL_SIZE)
+        self._renderer = Renderer(INITIAL_WIDTH, INITIAL_HEIGHT, CELL_SIZE)
         self._menu = MainMenu()
         self._hud = HUD()
         self._pause = PauseMenu()
@@ -71,7 +73,7 @@ class Game:
         """Start and run the main game loop until the player quits."""
         pygame.init()
         self._screen = pygame.display.set_mode(
-            (800, 600), pygame.RESIZABLE
+            (INITIAL_WIDTH, INITIAL_HEIGHT), pygame.RESIZABLE
         )
         pygame.display.set_caption("Pac-Man")
         clock = pygame.time.Clock()
@@ -175,7 +177,7 @@ class Game:
     def _start_game(self) -> None:
         self.level_index = 0
         self.cheat = CheatMode()
-        self._load_level(starting_lives=0, starting_score=0)
+        self._load_level(starting_lives=None, starting_score=0)
         self.state = GameState.PLAYING
 
     def _load_level(
@@ -229,9 +231,9 @@ class Game:
         self.level_index = 0
         self.cheat = CheatMode()
         self._screen = pygame.display.set_mode(
-            (800, 600), pygame.RESIZABLE
+            (INITIAL_WIDTH, INITIAL_HEIGHT), pygame.RESIZABLE
         )
-        self._renderer = Renderer(800, 600, CELL_SIZE)
+        self._renderer = Renderer(INITIAL_WIDTH, INITIAL_HEIGHT, CELL_SIZE)
         self.state = GameState.MAIN_MENU
 
     # ------------------------------------------------------------------

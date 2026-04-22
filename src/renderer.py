@@ -92,19 +92,19 @@ class Renderer:
     def _draw_maze(
         self, screen: pygame.Surface, level: "Level"
     ) -> None:
-        cs = self.cell_size
+        cell_size = self.cell_size
         for row in range(level.grid_height):
             for col in range(level.grid_width):
-                rx, ry = col * cs, row * cs
+                rx, ry = col * cell_size, row * cell_size
                 if level.grid[row][col] == CellType.WALL:
                     pygame.draw.rect(
-                        screen, _WALL, (rx, ry, cs, cs)
+                        screen, _WALL, (rx, ry, cell_size, cell_size)
                     )
-                    if cs >= 8:
+                    if cell_size >= 8:
                         pygame.draw.rect(
                             screen,
                             _WALL_INNER,
-                            (rx + 1, ry + 1, cs - 2, cs - 2),
+                            (rx + 1, ry + 1, cell_size - 2, cell_size - 2),
                         )
 
     # ------------------------------------------------------------------
@@ -114,20 +114,20 @@ class Renderer:
     def _draw_pellets(
         self, screen: pygame.Surface, level: "Level", tick: int
     ) -> None:
-        cs = self.cell_size
+        cell_size = self.cell_size
         for pellet in level.pellets:
             if pellet.eaten:
                 continue
-            px = pellet.x * cs + cs // 2
-            py = pellet.y * cs + cs // 2
+            px = pellet.x * cell_size + cell_size // 2
+            py = pellet.y * cell_size + cell_size // 2
             if pellet.pellet_type == PelletType.SUPER_PACGUM:
                 if (tick // 15) % 2 == 0:
                     pygame.draw.circle(
-                        screen, _SUPER, (px, py), max(3, cs // 3)
+                        screen, _SUPER, (px, py), max(3, cell_size // 3)
                     )
             else:
                 pygame.draw.circle(
-                    screen, _PACGUM, (px, py), max(2, cs // 7)
+                    screen, _PACGUM, (px, py), max(2, cell_size // 7)
                 )
 
     # ------------------------------------------------------------------
@@ -137,11 +137,11 @@ class Renderer:
     def _draw_player(
         self, screen: pygame.Surface, level: "Level", tick: int
     ) -> None:
-        cs = self.cell_size
+        cell_size = self.cell_size
         pl = level.player
-        cx = pl.x * cs + cs // 2
-        cy = pl.y * cs + cs // 2
-        r = max(3, cs // 2 - 1)
+        cx = pl.x * cell_size + cell_size // 2
+        cy = pl.y * cell_size + cell_size // 2
+        r = max(3, cell_size // 2 - 1)
 
         # Half-angle oscillates 0 → 40 → 0 over 20 frames
         phase = tick % 20
@@ -194,13 +194,13 @@ class Renderer:
     def _draw_ghosts(
         self, screen: pygame.Surface, level: "Level", tick: int
     ) -> None:
-        for idx, ghost in enumerate(level.ghosts):
+        for ghost in level.ghosts:
             if not ghost.is_active():
                 continue
-            cs = self.cell_size
-            cx = ghost.x * cs + cs // 2
-            cy = ghost.y * cs + cs // 2
-            r = max(3, cs // 2 - 1)
+            cell_size = self.cell_size
+            cx = ghost.x * cell_size + cell_size // 2
+            cy = ghost.y * cell_size + cell_size // 2
+            r = max(3, cell_size // 2 - 1)
 
             if ghost.state == GhostState.EDIBLE:
                 near_end = ghost.state_timer < 2.0
@@ -210,7 +210,7 @@ class Renderer:
                 )
                 show_eyes = False
             else:
-                color = _GHOST_COLORS[idx % len(_GHOST_COLORS)]
+                color = _GHOST_COLORS[ghost.ghost_id % len(_GHOST_COLORS)]
                 show_eyes = True
 
             self._draw_ghost(screen, cx, cy, r, color, show_eyes)

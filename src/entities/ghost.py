@@ -187,20 +187,33 @@ class Ghost:
             return None
 
         visited: set[tuple[int, int]] = {(self.x, self.y)}
-        queue: deque[list[tuple[int, int]]] = deque()
-        queue.append([(self.x, self.y)])
+        queue: deque[tuple[tuple[int, int], tuple[int, int] | None]] = deque()
+        queue.append(((self.x, self.y), None))
 
         while queue:
-            path = queue.popleft()
-            cx, cy = path[-1]
+            (cx, cy), first = queue.popleft()
             for nx, ny in self._neighbours(maze, cx, cy):
+                step = first or (nx, ny)
                 if (nx, ny) == (target_x, target_y):
-                    return path[1] if len(path) > 1 else (nx, ny)
+                    return step
                 if (nx, ny) not in visited:
                     visited.add((nx, ny))
-                    queue.append(path + [(nx, ny)])
+                    queue.append(((nx, ny), step))
 
         return None
+
+    def _move_wander(
+        self, maze: MazeGrid, player_x: int, player_y: int
+    ) -> None:
+        """Occasionally chase the player via BFS, otherwise move randomly."""
+        if random.random() < 0.3:
+            step = self._bfs_next_step(maze, player_x, player_y)
+            if step:
+                self.x, self.y = step
+                return
+        neighbours = self._neighbours(maze, self.x, self.y)
+        if neighbours:
+            self.x, self.y = random.choice(neighbours)
 
     def _move_chase(
         self, maze: MazeGrid, player_x: int, player_y: int
@@ -209,28 +222,17 @@ class Ghost:
 
         Ghost 0 (Blinky) always targets the player directly.
         Ghost 1 (Pinky) targets 2 cells ahead of the player.
-        Ghosts 2 and 3 use random walks with occasional BFS,
-        simulating unpredictable and wandering behaviour.
+        Ghosts 2 and 3 wander with occasional BFS chases.
 
         Args:
             maze: Maze grid.
             player_x: Player's column.
             player_y: Player's row.
         """
-        if self.ghost_id == 0:
-            target = (player_x, player_y)
-        elif self.ghost_id == 1:
-            target = (player_x + 2, player_y + 2)
-        else:
-            if random.random() < 0.3:
-                target = (player_x, player_y)
-            else:
-                neighbours = self._neighbours(maze, self.x, self.y)
-                if neighbours:
-                    nx, ny = random.choice(neighbours)
-                    self.x, self.y = nx, ny
-                return
-
+        if self.ghost_id >= 2:
+            self._move_wander(maze, player_x, player_y)
+            return
+        target = (player_x, player_y) if self.ghost_id == 0 else (player_x + 2, player_y + 2)
         step = self._bfs_next_step(maze, *target)
         if step:
             self.x, self.y = step
