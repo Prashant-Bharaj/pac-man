@@ -79,7 +79,10 @@ class Level:
             cx = cx + 1 if cx % 2 == 0 else cx
             cy = cy + 1 if cy % 2 == 0 else cy
 
-        lives = self.starting_lives if self.starting_lives is not None else self.config.lives
+        lives = (
+            self.starting_lives if self.starting_lives is not None
+            else self.config.lives
+        )
         self.player = Player(start_x=cx, start_y=cy, lives=lives)
         self.player.score = self.starting_score
 

@@ -177,7 +177,7 @@ class Game:
     def _start_game(self) -> None:
         self.level_index = 0
         self.cheat = CheatMode()
-        self._load_level(starting_lives=None, starting_score=0)
+        self._load_level(starting_lives=0, starting_score=0)
         self.state = GameState.PLAYING
 
     def _load_level(
