@@ -120,7 +120,6 @@ def generate_maze(
     try:
         from mazegenerator.mazegenerator import MazeGenerator
         mg = MazeGenerator(size=(width, height), perfect=perfect, seed=seed)
-        mg.generate(seed=seed)
         return _expand(mg.maze, width, height)
     except ImportError:
         logger.error(

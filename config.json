@@ -14,7 +14,7 @@
 
   # Level defaults
   "seed": 42,
-  "level_max_time": 90,
+  "level_max_time": 900,
 
   # Level definitions (at least 10 required)
   "levels": [

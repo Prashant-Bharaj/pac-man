@@ -58,6 +58,8 @@ class Renderer:
         self.screen_width = screen_width
         self.screen_height = screen_height
         self.cell_size = cell_size
+        self._maze_surface: pygame.Surface | None = None
+        self._maze_grid_id: int | None = None
         logger.debug(
             "Renderer initialised (%dx%d, cell=%d)",
             screen_width, screen_height, cell_size,
@@ -92,20 +94,29 @@ class Renderer:
     def _draw_maze(
         self, screen: pygame.Surface, level: "Level"
     ) -> None:
-        cell_size = self.cell_size
-        for row in range(level.grid_height):
-            for col in range(level.grid_width):
-                rx, ry = col * cell_size, row * cell_size
-                if level.grid[row][col] == CellType.WALL:
-                    pygame.draw.rect(
-                        screen, _WALL, (rx, ry, cell_size, cell_size)
-                    )
-                    if cell_size >= 8:
+        grid_id = id(level.grid)
+        if self._maze_surface is None or self._maze_grid_id != grid_id:
+            cell_size = self.cell_size
+            surf = pygame.Surface(
+                (level.grid_width * cell_size, level.grid_height * cell_size)
+            )
+            surf.fill(_FLOOR)
+            for row in range(level.grid_height):
+                for col in range(level.grid_width):
+                    if level.grid[row][col] == CellType.WALL:
+                        rx, ry = col * cell_size, row * cell_size
                         pygame.draw.rect(
-                            screen,
-                            _WALL_INNER,
-                            (rx + 1, ry + 1, cell_size - 2, cell_size - 2),
+                            surf, _WALL, (rx, ry, cell_size, cell_size)
                         )
+                        if cell_size >= 8:
+                            pygame.draw.rect(
+                                surf,
+                                _WALL_INNER,
+                                (rx + 1, ry + 1, cell_size - 2, cell_size - 2),
+                            )
+            self._maze_surface = surf
+            self._maze_grid_id = grid_id
+        screen.blit(self._maze_surface, (0, 0))
 
     # ------------------------------------------------------------------
     # Pellets
