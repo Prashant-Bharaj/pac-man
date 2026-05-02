@@ -93,13 +93,20 @@ class HUD:
         timer_surf = _font(18).render(f"TIME {secs:>3}s", True, timer_color)
         screen.blit(timer_surf, (w - timer_surf.get_width() - 8, offset_y + 4))
 
-        # Lives: mini Pac-Man icons
+        # Lives: mini Pac-Man icons or xN text
         life_r = 7
         life_y = offset_y + 30
-        for i in range(min(lives, 5)):
-            _draw_mini_pacman(
-                screen, 12 + i * (life_r * 2 + 4), life_y, life_r
-            )
+        if lives <= 5:
+            for i in range(lives):
+                _draw_mini_pacman(
+                    screen, 12 + i * (life_r * 2 + 6), life_y, life_r
+                )
+        else:
+            _draw_mini_pacman(screen, 12, life_y, life_r)
+            txt = f"x{lives}"
+            surf = _font(16).render(txt, True, _WHITE)
+            pos = (12 + life_r + 4, life_y - surf.get_height() // 2)
+            screen.blit(surf, pos)
 
         # Active cheats
         if active_cheats:

@@ -77,13 +77,13 @@ class MainMenu:
     ) -> None:
         if not highscores:
             return
-        start_y = h * 2 // 3
+        start_y = h * 1 // 2
         _blit_centred(screen, "TOP SCORES", start_y, _YELLOW, 24)
-        for i, entry in enumerate(highscores[:5]):
-            line = f"{i + 1}. {entry.name:<10}  {entry.score:>7}"
-            surf = _font(20).render(line, True, _CYAN)
+        for i, entry in enumerate(highscores[:10]):
+            line = f"{i + 1:>2}. {entry.name:<10}  {entry.score:>7}"
+            surf = _font(18).render(line, True, _CYAN)
             x = screen.get_width() // 2 - surf.get_width() // 2
-            screen.blit(surf, (x, start_y + 34 + i * 26))
+            screen.blit(surf, (x, start_y + 34 + i * 22))
 
     def handle_event(self, event: object) -> str | None:
         """Process a pygame event and return the selected action.
