@@ -30,7 +30,7 @@ async def main() -> None:
 
     config = load_config(config_path)
     game = Game(config)
-    await game.run()
+    game.run()
 
 
 # asyncio.run at module level so pygbag (web build) picks it up correctly.
