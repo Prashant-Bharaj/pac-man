@@ -1,4 +1,4 @@
-.PHONY: install run debug clean lint lint-strict test dist package
+.PHONY: install run debug clean lint lint-strict test package
 
 VERSION  := "0.0.1"
 PKG_NAME  = pac-man-$(VERSION)
@@ -42,9 +42,6 @@ run:
 
 debug:
 	uv run python -m pdb pac-main.py config.json
-
-dist:
-	uv add pyinstaller
 
 package:
 	rm -rf pkg/
