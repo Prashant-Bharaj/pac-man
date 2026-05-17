@@ -18,7 +18,7 @@ _font_cache: dict[int, pygame.font.Font] = {}
 
 def _font(size: int) -> pygame.font.Font:
     if size not in _font_cache:
-        _font_cache[size] = pygame.font.SysFont("monospace", size)
+        _font_cache[size] = pygame.font.Font(None, size)
     return _font_cache[size]
 
 
@@ -51,10 +51,11 @@ class MainMenu:
         _blit_centred(screen, "PAC-MAN", h // 10, _YELLOW, 56)
 
         controls: list[tuple[str, tuple[int, int, int]]] = [
-            ("SPACE  -  Start game", _WHITE),
-            ("ESC    -  Quit", _WHITE),
+            ("SPACE or Click  -  Start game", _WHITE),
+            ("ESC             -  Quit", _WHITE),
             ("", _WHITE),
             ("Arrow keys / WASD  - Move", _GRAY),
+            ("On-screen D-pad    - Move (touch)", _GRAY),
             ("P / ESC            - Pause", _GRAY),
             ("", _GRAY),
             ("Cheats (during game):", _GRAY),

@@ -1,7 +1,7 @@
-.PHONY: install run debug clean lint lint-strict test dist
+.PHONY: install run debug clean lint lint-strict test dist web
 
 # All project source files
-SRC = pac-man.py \
+SRC = main.py \
       src/__init__.py \
       src/config.py \
       src/game.py \
@@ -31,13 +31,24 @@ install:
 	uv sync --all-groups
 
 run:
-	uv run python pac-man.py config.json
+	uv run python main.py config.json
 
 debug:
-	uv run python -m pdb pac-man.py config.json
+	uv run python -m pdb main.py config.json
 
 dist:
 	uv run pyinstaller pac-man.spec
+
+WEB_STAGE = $(CURDIR)/build/pac-man
+
+web:
+	rm -rf $(WEB_STAGE)
+	mkdir -p $(WEB_STAGE)
+	cp main.py $(WEB_STAGE)/
+	cp config.json $(WEB_STAGE)/
+	cp -r src mazegenerator $(WEB_STAGE)/
+	uv run pygbag --build $(WEB_STAGE)/main.py
+	python3 scripts/zip_web.py $(WEB_STAGE)/build/web pac-man-web.zip
 
 clean:
 	find . -type d -name "__pycache__" -exec rm -rf {} + 2>/dev/null || true

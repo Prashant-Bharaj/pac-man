@@ -35,10 +35,45 @@ jobs:
         run: uv sync --all-groups
 
       - name: Build binary
-        run: uv run pyinstaller --onefile pac-man.py --name pac-man-linux
+        run: uv run pyinstaller --onefile main.py --name pac-man-linux
 
       - name: Upload to release
         uses: softprops/action-gh-release@v2
         with:
           files: dist/${{ matrix.artifact }}
+          generate_release_notes: true
+
+  build-web:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+
+      - uses: astral-sh/setup-uv@v3
+
+      - name: Install dependencies
+        run: uv sync --all-groups
+
+      - name: Stage game source for web build
+        run: |
+          mkdir -p build/pac-man
+          cp main.py build/pac-man/
+          cp config.json build/pac-man/
+          cp -r src build/pac-man/
+          cp -r mazegenerator build/pac-man/
+
+      - name: Build web
+        run: uv run pygbag --build build/pac-man/main.py
+
+      - name: Package web build
+        run: python3 scripts/zip_web.py build/pac-man/build/web pac-man-web.zip
+
+      - name: Upload to release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: pac-man-web.zip
           generate_release_notes: true

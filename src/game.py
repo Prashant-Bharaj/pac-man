@@ -1,5 +1,6 @@
 """Core game loop and state machine."""
 
+import asyncio
 import logging
 from enum import Enum, auto
 
@@ -15,6 +16,7 @@ from src.ui.gameover import GameOverScreen
 from src.ui.hud import HUD
 from src.ui.menu import MainMenu
 from src.ui.pause import PauseMenu
+from src.ui.touch import TouchDpad
 from src.ui.victory import VictoryScreen
 
 logger = logging.getLogger(__name__)
@@ -63,17 +65,19 @@ class Game:
         self._pause = PauseMenu()
         self._gameover = GameOverScreen()
         self._victory = VictoryScreen()
+        self._touch = TouchDpad()
         logger.info("Game initialised with %d levels", len(config.levels))
 
     # ------------------------------------------------------------------
     # Main loop
     # ------------------------------------------------------------------
 
-    def run(self) -> None:
+    async def run(self) -> None:
         """Start and run the main game loop until the player quits."""
         pygame.init()
+        pygame.font.init()
         self._screen = pygame.display.set_mode(
-            (INITIAL_WIDTH, INITIAL_HEIGHT), pygame.RESIZABLE
+            (INITIAL_WIDTH, INITIAL_HEIGHT)
         )
         pygame.display.set_caption("Pac-Man")
         clock = pygame.time.Clock()
@@ -91,6 +95,8 @@ class Game:
                 self._update(dt, self._screen)
                 pygame.display.flip()
 
+            await asyncio.sleep(0)
+
         pygame.quit()
 
     # ------------------------------------------------------------------
@@ -103,6 +109,20 @@ class Game:
             return
         if event.type == pygame.KEYDOWN:
             self._handle_keydown(event.key)
+        if event.type == pygame.MOUSEBUTTONDOWN:
+            self._handle_click(event.pos)
+
+    def _handle_click(self, pos: tuple[int, int]) -> None:
+        if self.state == GameState.MAIN_MENU:
+            self._start_game()
+        elif self.state == GameState.PLAYING:
+            direction = self._touch.direction_at(pos)
+            if direction is not None and self.level is not None:
+                self.level.player.set_direction(direction)
+        elif self.state == GameState.PAUSED:
+            self.state = GameState.PLAYING
+        elif self.state in (GameState.GAME_OVER, GameState.VICTORY):
+            self._reset_to_menu()
 
     def _handle_keydown(self, key: int) -> None:
         if self.state == GameState.MAIN_MENU:
@@ -231,7 +251,7 @@ class Game:
         self.level_index = 0
         self.cheat = CheatMode()
         self._screen = pygame.display.set_mode(
-            (INITIAL_WIDTH, INITIAL_HEIGHT), pygame.RESIZABLE
+            (INITIAL_WIDTH, INITIAL_HEIGHT)
         )
         self._renderer = Renderer(INITIAL_WIDTH, INITIAL_HEIGHT, CELL_SIZE)
         self.state = GameState.MAIN_MENU
@@ -312,3 +332,4 @@ class Game:
             self.cheat.active_cheats,
             hud_y,
         )
+        self._touch.render(screen)

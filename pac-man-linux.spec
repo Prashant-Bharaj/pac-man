@@ -2,7 +2,7 @@
 
 
 a = Analysis(
-    ['pac-man.py'],
+    ['main.py'],
     pathex=[],
     binaries=[],
     datas=[],

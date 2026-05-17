@@ -3,13 +3,14 @@
 Parses a JSON config file (with # comment support) into validated
 Pydantic models. Invalid values are clamped to safe defaults via
 field validators. Never raises on bad input.
+
+In environments where pydantic is unavailable (e.g. WASM/web builds),
+simple dataclasses with hardcoded defaults are used instead.
 """
 
 import json
 import logging
 from typing import Any
-
-from pydantic import BaseModel, Field, field_validator
 
 logger = logging.getLogger(__name__)
 
@@ -31,186 +32,221 @@ def _strip_comments(text: str) -> str:
     return "\n".join(lines)
 
 
-class LevelConfig(BaseModel):
-    """Configuration for a single level."""
+try:
+    from pydantic import BaseModel, Field, field_validator
 
-    width: int = Field(default=20, ge=10, le=100)
-    height: int = Field(default=20, ge=10, le=100)
-    seed: int = Field(default=42, ge=0, le=2**31 - 1)
+    class LevelConfig(BaseModel):
+        """Configuration for a single level."""
 
-    model_config = {"extra": "ignore"}
+        width: int = Field(default=20, ge=10, le=100)
+        height: int = Field(default=20, ge=10, le=100)
+        seed: int = Field(default=42, ge=0, le=2**31 - 1)
 
-    @field_validator("width", "height", mode="before")
-    @classmethod
-    def clamp_dimension(cls, v: Any) -> int:
-        """Clamp width/height to [10, 100].
+        model_config = {"extra": "ignore"}
 
-        Args:
-            v: Raw field value.
+        @field_validator("width", "height", mode="before")
+        @classmethod
+        def clamp_dimension(cls, v: Any) -> int:
+            """Clamp width/height to [10, 100].
 
-        Returns:
-            Integer clamped to valid range.
-        """
-        try:
-            return max(10, min(100, int(v)))
-        except (TypeError, ValueError):
-            return 20
+            Args:
+                v: Raw field value.
 
-    @field_validator("seed", mode="before")
-    @classmethod
-    def clamp_seed(cls, v: Any) -> int:
-        """Clamp seed to [0, 2^31-1].
+            Returns:
+                Integer clamped to valid range.
+            """
+            try:
+                return max(10, min(100, int(v)))
+            except (TypeError, ValueError):
+                return 20
 
-        Args:
-            v: Raw field value.
+        @field_validator("seed", mode="before")
+        @classmethod
+        def clamp_seed(cls, v: Any) -> int:
+            """Clamp seed to [0, 2^31-1].
 
-        Returns:
-            Integer clamped to valid range.
-        """
-        try:
-            return max(0, min(2**31 - 1, int(v)))
-        except (TypeError, ValueError):
-            return 42
+            Args:
+                v: Raw field value.
+
+            Returns:
+                Integer clamped to valid range.
+            """
+            try:
+                return max(0, min(2**31 - 1, int(v)))
+            except (TypeError, ValueError):
+                return 42
+
+    class GameConfig(BaseModel):
+        """Full validated game configuration."""
+
+        highscore_filename: str = "highscores.json"
+        lives: int = Field(default=3, ge=1, le=99)
+        pacgum: int = Field(default=42, ge=1, le=9999)
+        points_per_pacgum: int = Field(default=10, ge=0, le=99999)
+        points_per_super_pacgum: int = Field(default=50, ge=0, le=99999)
+        points_per_ghost: int = Field(default=200, ge=0, le=99999)
+        seed: int = Field(default=42, ge=0, le=2**31 - 1)
+        level_max_time: int = Field(default=90, ge=10, le=3600)
+        levels: list[LevelConfig] = Field(default_factory=list)
+
+        model_config = {"extra": "ignore"}
+
+        @field_validator("highscore_filename", mode="before")
+        @classmethod
+        def validate_filename(cls, v: Any) -> str:
+            """Fall back to default if filename is blank or not a string.
+
+            Args:
+                v: Raw field value.
+
+            Returns:
+                Validated filename string.
+            """
+            if not isinstance(v, str) or not v.strip():
+                logger.warning(
+                    "Config 'highscore_filename' is invalid, using default"
+                )
+                return "highscores.json"
+            return v.strip()
+
+        @field_validator("lives", mode="before")
+        @classmethod
+        def clamp_lives(cls, v: Any) -> int:
+            """Clamp lives to [1, 99].
+
+            Args:
+                v: Raw field value.
+
+            Returns:
+                Integer clamped to valid range.
+            """
+            try:
+                return max(1, min(99, int(v)))
+            except (TypeError, ValueError):
+                return 3
+
+        @field_validator("pacgum", mode="before")
+        @classmethod
+        def clamp_pacgum(cls, v: Any) -> int:
+            """Clamp pacgum count to [1, 9999].
+
+            Args:
+                v: Raw field value.
+
+            Returns:
+                Integer clamped to valid range.
+            """
+            try:
+                return max(1, min(9999, int(v)))
+            except (TypeError, ValueError):
+                return 42
+
+        @field_validator(
+            "points_per_pacgum",
+            "points_per_super_pacgum",
+            "points_per_ghost",
+            mode="before",
+        )
+        @classmethod
+        def clamp_points(cls, v: Any) -> int:
+            """Clamp point values to [0, 99999].
+
+            Args:
+                v: Raw field value.
+
+            Returns:
+                Integer clamped to valid range.
+            """
+            try:
+                return max(0, min(99999, int(v)))
+            except (TypeError, ValueError):
+                return 0
+
+        @field_validator("seed", mode="before")
+        @classmethod
+        def clamp_seed(cls, v: Any) -> int:
+            """Clamp seed to [0, 2^31-1].
+
+            Args:
+                v: Raw field value.
+
+            Returns:
+                Integer clamped to valid range.
+            """
+            try:
+                return max(0, min(2**31 - 1, int(v)))
+            except (TypeError, ValueError):
+                return 42
+
+        @field_validator("level_max_time", mode="before")
+        @classmethod
+        def clamp_level_max_time(cls, v: Any) -> int:
+            """Clamp level_max_time to [10, 3600].
+
+            Args:
+                v: Raw field value.
+
+            Returns:
+                Integer clamped to valid range.
+            """
+            try:
+                return max(10, min(3600, int(v)))
+            except (TypeError, ValueError):
+                return 90
+
+        @field_validator("levels", mode="before")
+        @classmethod
+        def validate_levels(cls, v: Any) -> list[Any]:
+            """Fall back to 10 default levels if array is missing or empty.
+
+            Args:
+                v: Raw field value.
+
+            Returns:
+                List of level dicts (may be empty list for default handling).
+            """
+            if not isinstance(v, list) or not v:
+                logger.warning(
+                    "Config 'levels' is missing or empty, using 10 default levels"
+                )
+                return [{}] * 10
+            return v
+
+except ImportError:
+    # Pydantic v2 requires pydantic-core (Rust extension) which is unavailable
+    # in WASM/web builds. Fall back to simple dataclasses with fixed defaults.
+    from dataclasses import dataclass, field as _dc_field
+
+    @dataclass
+    class LevelConfig:  # type: ignore[no-redef]
+        """Configuration for a single level (web fallback)."""
+
+        width: int = 20
+        height: int = 20
+        seed: int = 42
+
+    @dataclass
+    class GameConfig:  # type: ignore[no-redef]
+        """Full game configuration (web fallback — hardcoded defaults)."""
+
+        highscore_filename: str = "highscores.json"
+        lives: int = 3
+        pacgum: int = 42
+        points_per_pacgum: int = 10
+        points_per_super_pacgum: int = 50
+        points_per_ghost: int = 200
+        seed: int = 42
+        level_max_time: int = 90
+        levels: list = _dc_field(
+            default_factory=lambda: [LevelConfig() for _ in range(10)]
+        )
+
+        @classmethod
+        def model_validate(cls, _data: Any) -> "GameConfig":
+            return cls()
 
 
-class GameConfig(BaseModel):
-    """Full validated game configuration."""
-
-    highscore_filename: str = "highscores.json"
-    lives: int = Field(default=3, ge=1, le=99)
-    pacgum: int = Field(default=42, ge=1, le=9999)
-    points_per_pacgum: int = Field(default=10, ge=0, le=99999)
-    points_per_super_pacgum: int = Field(default=50, ge=0, le=99999)
-    points_per_ghost: int = Field(default=200, ge=0, le=99999)
-    seed: int = Field(default=42, ge=0, le=2**31 - 1)
-    level_max_time: int = Field(default=90, ge=10, le=3600)
-    levels: list[LevelConfig] = Field(default_factory=list)
-
-    model_config = {"extra": "ignore"}
-
-    @field_validator("highscore_filename", mode="before")
-    @classmethod
-    def validate_filename(cls, v: Any) -> str:
-        """Fall back to default if filename is blank or not a string.
-
-        Args:
-            v: Raw field value.
-
-        Returns:
-            Validated filename string.
-        """
-        if not isinstance(v, str) or not v.strip():
-            logger.warning(
-                "Config 'highscore_filename' is invalid, using default"
-            )
-            return "highscores.json"
-        return v.strip()
-
-    @field_validator("lives", mode="before")
-    @classmethod
-    def clamp_lives(cls, v: Any) -> int:
-        """Clamp lives to [1, 99].
-
-        Args:
-            v: Raw field value.
-
-        Returns:
-            Integer clamped to valid range.
-        """
-        try:
-            return max(1, min(99, int(v)))
-        except (TypeError, ValueError):
-            return 3
-
-    @field_validator("pacgum", mode="before")
-    @classmethod
-    def clamp_pacgum(cls, v: Any) -> int:
-        """Clamp pacgum count to [1, 9999].
-
-        Args:
-            v: Raw field value.
-
-        Returns:
-            Integer clamped to valid range.
-        """
-        try:
-            return max(1, min(9999, int(v)))
-        except (TypeError, ValueError):
-            return 42
-
-    @field_validator(
-        "points_per_pacgum",
-        "points_per_super_pacgum",
-        "points_per_ghost",
-        mode="before",
-    )
-    @classmethod
-    def clamp_points(cls, v: Any) -> int:
-        """Clamp point values to [0, 99999].
-
-        Args:
-            v: Raw field value.
-
-        Returns:
-            Integer clamped to valid range.
-        """
-        try:
-            return max(0, min(99999, int(v)))
-        except (TypeError, ValueError):
-            return 0
-
-    @field_validator("seed", mode="before")
-    @classmethod
-    def clamp_seed(cls, v: Any) -> int:
-        """Clamp seed to [0, 2^31-1].
-
-        Args:
-            v: Raw field value.
-
-        Returns:
-            Integer clamped to valid range.
-        """
-        try:
-            return max(0, min(2**31 - 1, int(v)))
-        except (TypeError, ValueError):
-            return 42
-
-    @field_validator("level_max_time", mode="before")
-    @classmethod
-    def clamp_level_max_time(cls, v: Any) -> int:
-        """Clamp level_max_time to [10, 3600].
-
-        Args:
-            v: Raw field value.
-
-        Returns:
-            Integer clamped to valid range.
-        """
-        try:
-            return max(10, min(3600, int(v)))
-        except (TypeError, ValueError):
-            return 90
-
-    @field_validator("levels", mode="before")
-    @classmethod
-    def validate_levels(cls, v: Any) -> list[Any]:
-        """Fall back to 10 default levels if array is missing or empty.
-
-        Args:
-            v: Raw field value.
-
-        Returns:
-            List of level dicts (may be empty list for default handling).
-        """
-        if not isinstance(v, list) or not v:
-            logger.warning(
-                "Config 'levels' is missing or empty, using 10 default levels"
-            )
-            return [{}] * 10
-        return v
-
-
-def load_config(path: str) -> GameConfig:
+def load_config(path: str) -> "GameConfig":
     """Load and validate a game config file.
 
     Invalid values are clamped to safe defaults with a log warning.
