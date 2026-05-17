@@ -1,4 +1,4 @@
-.PHONY: install run debug clean lint lint-strict test
+.PHONY: install run debug clean lint lint-strict test dist
 
 # All project source files
 SRC = pac-man.py \
@@ -35,6 +35,9 @@ run:
 
 debug:
 	uv run python -m pdb pac-man.py config.json
+
+dist:
+	uv run pyinstaller pac-man.spec
 
 clean:
 	find . -type d -name "__pycache__" -exec rm -rf {} + 2>/dev/null || true

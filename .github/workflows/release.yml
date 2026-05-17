@@ -1,0 +1,51 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    strategy:
+      matrix:
+        include:
+          - os: ubuntu-latest
+            artifact: pac-man-linux
+            binary: dist/pac-man
+          - os: windows-latest
+            artifact: pac-man-windows.exe
+            binary: dist/pac-man.exe
+          - os: macos-latest
+            artifact: pac-man-macos
+            binary: dist/pac-man
+
+    runs-on: ${{ matrix.os }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+
+      - uses: astral-sh/setup-uv@v3
+
+      - name: Install dependencies
+        run: uv sync --all-groups
+
+      - name: Build binary
+        run: uv run pyinstaller pac-man.spec
+
+      - name: Rename binary
+        shell: bash
+        run: mv "${{ matrix.binary }}" "dist/${{ matrix.artifact }}"
+
+      - name: Upload to release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: dist/${{ matrix.artifact }}
+          generate_release_notes: true

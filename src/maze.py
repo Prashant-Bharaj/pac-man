@@ -11,6 +11,7 @@ Falls back to a minimal open maze on any generator error.
 
 import logging
 from enum import Enum
+from typing import Any
 
 logger = logging.getLogger(__name__)
 
@@ -100,6 +101,36 @@ def _expand(cell_grid: list[list[int]], width: int, height: int) -> MazeGrid:
     return grid
 
 
+def _iterative_generate_maze(
+    self: Any, x: int, y: int, from_code: int
+) -> None:
+    """Iterative replacement for MazeGenerator._generate_maze.
+
+    Replaces the library's recursive DFS with a stack to avoid Python
+    call-stack overhead (~841 frames for 29x29). Preserves exact traversal
+    order and random behavior by keeping each cell's _get_neighbors generator
+    in the stack so it resumes where it left off after backtracking.
+    """
+    self._path[y][x] = 1
+    non_mutable = self._maze[y][x]
+    self._maze[y][x] = 15 & ~from_code
+    stack = [(x, y, non_mutable, self._get_neighbors(x, y))]
+
+    while stack:
+        cx, cy, nm, nbrs = stack[-1]
+        for nx, ny, code, opp_code in nbrs:
+            if code & nm:
+                continue
+            self._maze[cy][cx] &= ~code
+            self._path[ny][nx] = 1
+            new_nm = self._maze[ny][nx]
+            self._maze[ny][nx] = 15 & ~opp_code
+            stack.append((nx, ny, new_nm, self._get_neighbors(nx, ny)))
+            break
+        else:
+            stack.pop()
+
+
 def generate_maze(
     width: int, height: int, seed: int, perfect: bool = False
 ) -> MazeGrid:
@@ -119,6 +150,14 @@ def generate_maze(
     """
     try:
         from mazegenerator.mazegenerator import MazeGenerator
+        # _find_short_path runs an IDDFS up to width*height iterations and
+        # blocks the main thread for seconds on larger mazes. We never read
+        # MazeGenerator.shortest_path, so skip it entirely.
+        MazeGenerator._find_short_path = lambda self: None
+        # _generate_maze is a recursive DFS; at 29x29 that's ~841 Python
+        # stack frames. Replace with an iterative version to avoid the
+        # per-frame overhead.
+        MazeGenerator._generate_maze = _iterative_generate_maze
         mg = MazeGenerator(size=(width, height), perfect=perfect, seed=seed)
         return _expand(mg.maze, width, height)
     except ImportError:
