@@ -81,6 +81,39 @@ def test_empty_levels_uses_defaults(tmp_path: Path) -> None:
     assert len(cfg.levels) == 10
 
 
+def test_invalid_level_entry_uses_default(tmp_path: Path) -> None:
+    """A malformed level entry is replaced with a default level."""
+    path = write_config(tmp_path, '{"levels": ["bad"]}')
+    cfg = load_config(path)
+    assert len(cfg.levels) == 1
+    assert cfg.levels[0].width == 20
+    assert cfg.levels[0].height == 20
+    assert cfg.levels[0].seed == 42
+
+
+def test_invalid_level_entries_preserve_length(tmp_path: Path) -> None:
+    """Multiple malformed level entries become default levels."""
+    path = write_config(tmp_path, '{"levels": [null, 1, []]}')
+    cfg = load_config(path)
+    assert len(cfg.levels) == 3
+    assert all(level.width == 20 for level in cfg.levels)
+    assert all(level.height == 20 for level in cfg.levels)
+
+
+def test_mixed_level_entries_keep_valid_values(tmp_path: Path) -> None:
+    """Valid level entries are preserved while malformed ones default."""
+    path = write_config(
+        tmp_path,
+        '{"levels": [{"width": 15, "height": 16}, "bad"]}',
+    )
+    cfg = load_config(path)
+    assert len(cfg.levels) == 2
+    assert cfg.levels[0].width == 15
+    assert cfg.levels[0].height == 16
+    assert cfg.levels[1].width == 20
+    assert cfg.levels[1].height == 20
+
+
 def test_missing_keys_use_defaults(tmp_path: Path) -> None:
     """Config with no keys at all uses all defaults."""
     path = write_config(tmp_path, '{}')
