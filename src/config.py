@@ -34,8 +34,8 @@ def _strip_comments(text: str) -> str:
 class LevelConfig(BaseModel):
     """Configuration for a single level."""
 
-    width: int = Field(default=20, ge=10, le=100)
-    height: int = Field(default=20, ge=10, le=100)
+    width: int = Field(default=20, ge=7)
+    height: int = Field(default=20, ge=7)
     seed: int = Field(default=42, ge=0, le=2**31 - 1)
 
     model_config = {"extra": "ignore"}
@@ -43,7 +43,7 @@ class LevelConfig(BaseModel):
     @field_validator("width", "height", mode="before")
     @classmethod
     def clamp_dimension(cls, v: Any) -> int:
-        """Clamp width/height to [10, 100].
+        """Clamp width/height to minimum 7.
 
         Args:
             v: Raw field value.
@@ -52,7 +52,7 @@ class LevelConfig(BaseModel):
             Integer clamped to valid range.
         """
         try:
-            return max(10, min(100, int(v)))
+            return max(7, int(v))
         except (TypeError, ValueError):
             return 20
 

@@ -2,6 +2,7 @@
 
 import logging
 import random
+from collections import deque
 from dataclasses import dataclass, field
 from enum import Enum, auto
 
@@ -10,12 +11,22 @@ from src.config import GameConfig, LevelConfig
 from src.entities.ghost import Ghost
 from src.entities.pellet import Pellet, PelletType
 from src.entities.player import Player
-from src.maze import MazeGrid, generate_maze, grid_size, is_corridor
+from src.maze import (
+    CellType,
+    MazeGrid,
+    generate_visible_maze,
+    grid_size,
+    is_corridor,
+)
 
 logger = logging.getLogger(__name__)
 
 SPEED_NORMAL: float = 0.15
 SPEED_BOOST: float = 0.08
+FT_PATTERN_WIDTH: int = 7
+FT_PATTERN_HEIGHT: int = 5
+FT_SPAWN_OFFSET_X: int = 3
+FT_SPAWN_OFFSET_Y: int = 1
 
 
 class LevelEvent(Enum):
@@ -65,7 +76,7 @@ class Level:
         else:
             seed = random.randint(0, 2**31 - 1)
 
-        self.grid = generate_maze(
+        self.grid = generate_visible_maze(
             self.level_cfg.width,
             self.level_cfg.height,
             seed=seed,
@@ -78,11 +89,9 @@ class Level:
         """Place player, ghosts, and pellets on the expanded maze grid."""
         w = self.grid_width
         h = self.grid_height
-        cx, cy = w // 2, h // 2
-
-        if not is_corridor(self.grid, cx, cy):
-            cx = cx + 1 if cx % 2 == 0 else cx
-            cy = cy + 1 if cy % 2 == 0 else cy
+        cx, cy = self._player_start()
+        reachable = self._reachable_corridors(cx, cy)
+        self._remove_unreachable_corridors(reachable)
 
         lives = (
             self.starting_lives if self.starting_lives is not None
@@ -94,10 +103,16 @@ class Level:
         corner_candidates = [
             (1, 1), (w - 2, 1), (1, h - 2), (w - 2, h - 2),
         ]
-        corners = [
-            (x, y) for x, y in corner_candidates
-            if is_corridor(self.grid, x, y)
-        ]
+        corners: list[tuple[int, int]] = []
+        for candidate in corner_candidates:
+            corner = self._nearest_reachable_corridor(
+                candidate[0],
+                candidate[1],
+                reachable,
+                set(corners),
+            )
+            if corner is not None:
+                corners.append(corner)
         while len(corners) < 4:
             corners.append(corners[0] if corners else (1, 1))
 
@@ -123,6 +138,121 @@ class Level:
                     self.pellets.append(
                         Pellet(x=col, y=row, pellet_type=PelletType.PACGUM)
                     )
+
+    def _player_start(self) -> tuple[int, int]:
+        """Return the preferred player start for the current maze."""
+        start = self._ft_pattern_player_start()
+        if start is not None:
+            return start
+
+        return self._nearest_corridor(
+            self.grid_width // 2,
+            self.grid_height // 2,
+        )
+
+    def _ft_pattern_player_start(self) -> tuple[int, int] | None:
+        """Return the corridor between 4 and 2 when the pattern exists."""
+        logical_width = (self.grid_width - 1) // 2
+        logical_height = (self.grid_height - 1) // 2
+        if (
+            logical_width < FT_PATTERN_WIDTH * 2
+            or logical_height < FT_PATTERN_HEIGHT * 2
+        ):
+            return None
+
+        pattern_x = int((logical_width - FT_PATTERN_WIDTH) / 2)
+        pattern_y = int((logical_height - FT_PATTERN_HEIGHT) / 2)
+        start_x = 2 * (pattern_x + FT_SPAWN_OFFSET_X) + 1
+        start_y = 2 * (pattern_y + FT_SPAWN_OFFSET_Y) + 1
+        if is_corridor(self.grid, start_x, start_y):
+            return start_x, start_y
+        return None
+
+    def _nearest_corridor(self, x: int, y: int) -> tuple[int, int]:
+        """Find the nearest corridor to a target coordinate."""
+        found = self._nearest_reachable_corridor(
+            x,
+            y,
+            {
+                (col, row)
+                for row in range(self.grid_height)
+                for col in range(self.grid_width)
+                if is_corridor(self.grid, col, row)
+            },
+            set(),
+        )
+        if found is None:
+            logger.error("Maze has no corridors; placing player at (1, 1)")
+            return 1, 1
+        return found
+
+    def _nearest_reachable_corridor(
+        self,
+        x: int,
+        y: int,
+        reachable: set[tuple[int, int]],
+        excluded: set[tuple[int, int]],
+    ) -> tuple[int, int] | None:
+        """Find the nearest reachable corridor not already reserved."""
+        visited = {(x, y)}
+        queue: deque[tuple[int, int]] = deque([(x, y)])
+        while queue:
+            cx, cy = queue.popleft()
+            if (cx, cy) in reachable and (cx, cy) not in excluded:
+                return cx, cy
+            for nx, ny in (
+                (cx + 1, cy),
+                (cx - 1, cy),
+                (cx, cy + 1),
+                (cx, cy - 1),
+            ):
+                if (
+                    nx < 0 or ny < 0
+                    or nx >= self.grid_width
+                    or ny >= self.grid_height
+                    or (nx, ny) in visited
+                ):
+                    continue
+                visited.add((nx, ny))
+                queue.append((nx, ny))
+        return None
+
+    def _reachable_corridors(self, x: int, y: int) -> set[tuple[int, int]]:
+        """Return all corridors connected to the player start."""
+        if not is_corridor(self.grid, x, y):
+            return set()
+
+        reachable = {(x, y)}
+        queue: deque[tuple[int, int]] = deque([(x, y)])
+        while queue:
+            cx, cy = queue.popleft()
+            for nx, ny in (
+                (cx + 1, cy),
+                (cx - 1, cy),
+                (cx, cy + 1),
+                (cx, cy - 1),
+            ):
+                if (
+                    (nx, ny) in reachable
+                    or not is_corridor(self.grid, nx, ny)
+                ):
+                    continue
+                reachable.add((nx, ny))
+                queue.append((nx, ny))
+        return reachable
+
+    def _remove_unreachable_corridors(
+        self,
+        reachable: set[tuple[int, int]],
+    ) -> None:
+        """Turn corridor islands outside the player area into walls."""
+        for row in range(self.grid_height):
+            for col in range(self.grid_width):
+                if (
+                    (col, row) not in reachable
+                    and is_corridor(self.grid, col, row)
+                ):
+                    self.grid[row][col] = CellType.WALL
 
     # ------------------------------------------------------------------
     # Update loop

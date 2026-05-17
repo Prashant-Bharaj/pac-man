@@ -74,6 +74,44 @@ def test_invalid_lives_clamped(tmp_path: Path) -> None:
     assert cfg.lives >= 1
 
 
+def test_level_dimensions_clamped_to_minimum(tmp_path: Path) -> None:
+    """Level dimensions below 7 are clamped to 7."""
+    path = write_config(tmp_path, '{"levels": [{"width": 6, "height": 5}]}')
+    cfg = load_config(path)
+    assert cfg.levels[0].width == 7
+    assert cfg.levels[0].height == 7
+
+
+def test_level_dimensions_allow_seven(tmp_path: Path) -> None:
+    """7x7 is the minimum accepted level size."""
+    path = write_config(tmp_path, '{"levels": [{"width": 7, "height": 7}]}')
+    cfg = load_config(path)
+    assert cfg.levels[0].width == 7
+    assert cfg.levels[0].height == 7
+
+
+def test_level_dimensions_have_no_maximum_clamp(tmp_path: Path) -> None:
+    """Level dimensions above 100 are preserved."""
+    path = write_config(
+        tmp_path,
+        '{"levels": [{"width": 101, "height": 250}]}',
+    )
+    cfg = load_config(path)
+    assert cfg.levels[0].width == 101
+    assert cfg.levels[0].height == 250
+
+
+def test_invalid_level_dimension_uses_default(tmp_path: Path) -> None:
+    """Non-numeric level dimensions fall back to defaults."""
+    path = write_config(
+        tmp_path,
+        '{"levels": [{"width": "bad", "height": "bad"}]}',
+    )
+    cfg = load_config(path)
+    assert cfg.levels[0].width == 20
+    assert cfg.levels[0].height == 20
+
+
 def test_empty_levels_uses_defaults(tmp_path: Path) -> None:
     """An empty levels array falls back to 10 default levels."""
     path = write_config(tmp_path, '{"levels": []}')
