@@ -26,6 +26,7 @@ _EDIBLE: tuple[int, int, int] = (0, 80, 255)
 _EDIBLE_FLASH: tuple[int, int, int] = (200, 200, 255)
 _WHITE: tuple[int, int, int] = (255, 255, 255)
 _DARK_BLUE: tuple[int, int, int] = (0, 0, 200)
+_INVINCIBLE_GHOST: tuple[int, int, int] = (150, 150, 150)
 _GHOST_COLORS: list[tuple[int, int, int]] = [
     (230, 0, 0),
     (255, 184, 255),
@@ -74,6 +75,7 @@ class Renderer:
         screen: pygame.Surface,
         level: "Level",
         tick: int,
+        is_invincible: bool = False,
     ) -> None:
         """Draw the full level: maze, pellets, ghosts, player.
 
@@ -81,10 +83,11 @@ class Renderer:
             screen: Pygame surface to draw on.
             level: Current level state.
             tick: Frame counter used for animation timing.
+            is_invincible: Whether the invincible cheat is active.
         """
         self._draw_maze(screen, level)
         self._draw_pellets(screen, level, tick)
-        self._draw_ghosts(screen, level, tick)
+        self._draw_ghosts(screen, level, tick, is_invincible)
         self._draw_player(screen, level, tick)
 
     # ------------------------------------------------------------------
@@ -269,7 +272,7 @@ class Renderer:
     # ------------------------------------------------------------------
 
     def _draw_ghosts(
-        self, screen: pygame.Surface, level: "Level", tick: int
+        self, screen: pygame.Surface, level: "Level", tick: int, is_invincible: bool = False
     ) -> None:
         for ghost in level.ghosts:
             if not ghost.is_active():
@@ -286,6 +289,9 @@ class Renderer:
                     _EDIBLE_FLASH if flash else _EDIBLE
                 )
                 show_eyes = False
+            elif is_invincible:
+                color = _INVINCIBLE_GHOST
+                show_eyes = True
             else:
                 color = _GHOST_COLORS[ghost.ghost_id % len(_GHOST_COLORS)]
                 show_eyes = True
