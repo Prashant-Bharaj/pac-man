@@ -1,6 +1,6 @@
 .PHONY: install run debug clean lint lint-strict test dist package
 
-VERSION  := $(shell cat build/version.txt 2>/dev/null || echo "0.0.0")
+VERSION  := "0.0.1"
 PKG_NAME  = pac-man-$(VERSION)
 PKG_DIR   = pkg/$(PKG_NAME)
 PKG_ZIP   = pkg/$(PKG_NAME).zip
