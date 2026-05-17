@@ -98,19 +98,19 @@ def test_videoresize_event_updates_playing_layout(
     """VIDEORESIZE updates the layout while gameplay is active."""
     game = _game_with_level()
     game.state = GameState.PLAYING
-    called: dict[str, int] = {}
+    resize_params: dict[str, int] = {}
 
     def fake_resize_window(
         max_w: int | None = None, max_h: int | None = None
     ) -> None:
         if max_w is not None:
-            called["w"] = max_w
+            resize_params["w"] = max_w
         if max_h is not None:
-            called["h"] = max_h
+            resize_params["h"] = max_h
 
     monkeypatch.setattr(game, "_resize_window", fake_resize_window)
 
     event = pygame.event.Event(pygame.VIDEORESIZE, {"w": 1024, "h": 768})
     game._handle_event(event)
 
-    assert called == {"w": 1024, "h": 768}
+    assert resize_params == {"w": 1024, "h": 768}

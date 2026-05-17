@@ -229,9 +229,6 @@ class Game:
         )
         hud_height = max(MIN_HUD_HEIGHT, cell_size * HUD_ROWS)
         content_h = grid_h * cell_size + hud_height
-        if content_h > max_h:
-            hud_height = max(0, max_h - grid_h * cell_size)
-            content_h = grid_h * cell_size + hud_height
         window_w = min(max_w, grid_w * cell_size)
         window_h = min(max_h, content_h)
         return cell_size, hud_height, window_w, window_h
