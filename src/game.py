@@ -108,6 +108,7 @@ class Game:
             return
         if (
             event.type == pygame.VIDEORESIZE
+            and self.level is not None
             and self.state in (GameState.PLAYING, GameState.PAUSED)
         ):
             self._resize_window(max_w=event.w, max_h=event.h)
@@ -214,15 +215,21 @@ class Game:
     def _compute_responsive_layout(
         self, grid_w: int, grid_h: int, max_w: int, max_h: int
     ) -> tuple[int, int, int, int]:
+        min_hud_height = 24
         max_w = max(1, max_w)
         max_h = max(1, max_h)
         cell_by_w = max_w // max(1, grid_w)
         cell_by_h = max_h // max(1, grid_h + HUD_ROWS)
         cell_size = max(MIN_CELL_SIZE, min(cell_by_w, cell_by_h))
-        hud_height = max(24, cell_size * HUD_ROWS)
+        while (
+            cell_size > MIN_CELL_SIZE
+            and grid_h * cell_size + min_hud_height > max_h
+        ):
+            cell_size -= 1
+        hud_height = max(min_hud_height, cell_size * HUD_ROWS)
         content_h = grid_h * cell_size + hud_height
         if content_h > max_h:
-            hud_height = max(24, max_h - grid_h * cell_size)
+            hud_height = max(0, max_h - grid_h * cell_size)
             content_h = grid_h * cell_size + hud_height
         window_w = min(max_w, grid_w * cell_size)
         window_h = min(max_h, content_h)
