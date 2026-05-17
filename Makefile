@@ -1,7 +1,12 @@
-.PHONY: install run debug clean lint lint-strict test dist
+.PHONY: install run debug clean lint lint-strict test dist package
+
+VERSION  := $(shell cat build/version.txt 2>/dev/null || echo "0.0.0")
+PKG_NAME  = pac-man-$(VERSION)
+PKG_DIR   = pkg/$(PKG_NAME)
+PKG_ZIP   = pkg/$(PKG_NAME).zip
 
 # All project source files
-SRC = main.py \
+SRC = pac-main.py \
       src/__init__.py \
       src/config.py \
       src/game.py \
@@ -33,13 +38,26 @@ install:
 	uv sync --all-groups
 
 run:
-	uv run python main.py config.json
+	uv run python pac-main.py config.json
 
 debug:
-	uv run python -m pdb main.py config.json
+	uv run python -m pdb pac-main.py config.json
 
 dist:
-	uv run pyinstaller pac-man.spec
+	uv add pyinstaller
+
+package:
+	rm -rf pkg/
+	mkdir -p pkg/$(PKG_NAME)
+	cp pac-main.py Makefile pyproject.toml uv.lock config.json \
+	   mazegenerator-2.0.1-py3-none-any.whl README.txt \
+	   pkg/$(PKG_NAME)/
+	cp -r src tests pkg/$(PKG_NAME)/
+	find pkg/$(PKG_NAME) -type d -name "__pycache__" -exec rm -rf {} + 2>/dev/null || true
+	find pkg/$(PKG_NAME) -name "*.pyc" -o -name "*.pyo" -delete 2>/dev/null || true
+	cd pkg && python3 -m zipfile -c $(PKG_NAME).zip $(PKG_NAME)/
+	rm -rf pkg/$(PKG_NAME)
+	@echo "Package created: pkg/$(PKG_NAME).zip"
 
 clean:
 	find . -type d -name "__pycache__" -exec rm -rf {} + 2>/dev/null || true
@@ -47,6 +65,7 @@ clean:
 	find . -type d -name ".pytest_cache" -exec rm -rf {} + 2>/dev/null || true
 	find . -name "*.pyc" -delete 2>/dev/null || true
 	find . -name "*.pyo" -delete 2>/dev/null || true
+	rm -rf pkg/
 
 lint:
 	uv run flake8 $(SRC)

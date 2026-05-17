@@ -6,6 +6,7 @@ dependencies = [
     "mazegenerator",
     "pydantic>=2.13.3",
     "pygame>=2.5.0",
+    "pyinstaller>=6.20.0",
 ]
 
 [dependency-groups]
