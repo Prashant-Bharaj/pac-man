@@ -1,7 +1,7 @@
 """Entry point for the Pac-Man game.
 
 Usage:
-    python3 pac-man.py [config.json]
+    python3 main.py [config.json]
 """
 
 import asyncio

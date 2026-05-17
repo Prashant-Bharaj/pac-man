@@ -1,7 +1,7 @@
 # -*- mode: python ; coding: utf-8 -*-
 
 a = Analysis(
-    ["pac-man.py"],
+    ["main.py"],
     pathex=[],
     binaries=[],
     datas=[("config.json", ".")],
