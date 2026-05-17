@@ -54,3 +54,5 @@ docs/
 .claude/
 .cursor/
 
+# PDF subject file
+*subject.pdf

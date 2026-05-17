@@ -93,8 +93,9 @@ Active cheats are shown in the HUD strip at the bottom of the screen.
 
 | Key | Action |
 |-----|--------|
-| `SPACE` | Start game (main menu) |
-| `ESC` | Quit (main menu) / Main menu (pause) |
+| `UP` / `DOWN` | Move main menu selection |
+| `ENTER` / `SPACE` | Confirm selected menu item |
+| `ESC` | Back / Quit from main menu / Main menu (pause) |
 | `M` | Main menu (pause screen) |
 | `ENTER` | Confirm name and save score (game over / victory) |
 

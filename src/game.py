@@ -106,9 +106,10 @@ class Game:
 
     def _handle_keydown(self, key: int) -> None:
         if self.state == GameState.MAIN_MENU:
-            if key == pygame.K_SPACE:
+            action = self._menu.handle_keydown(key)
+            if action == "start":
                 self._start_game()
-            elif key == pygame.K_ESCAPE:
+            elif action == "exit":
                 self.state = GameState.QUIT
 
         elif self.state == GameState.PLAYING:
