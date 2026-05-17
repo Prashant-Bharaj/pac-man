@@ -64,3 +64,53 @@ def test_escape_on_main_menu_quits_game() -> None:
     game._handle_keydown(pygame.K_ESCAPE)
 
     assert game.state == GameState.QUIT
+
+
+def test_layout_expands_cells_on_large_screens() -> None:
+    """Large displays increase maze cell size."""
+    game = _game_with_level()
+
+    cell_size, _, win_w, win_h = game._compute_responsive_layout(
+        39, 39, 1920, 1080
+    )
+
+    assert cell_size > 16
+    assert win_w <= 1920
+    assert win_h <= 1080
+
+
+def test_layout_shrinks_cells_for_large_levels_on_small_screens() -> None:
+    """Small displays shrink maze cell size to keep content fitting."""
+    game = _game_with_level()
+
+    cell_size, _, win_w, win_h = game._compute_responsive_layout(
+        199, 199, 800, 600
+    )
+
+    assert cell_size < 16
+    assert win_w <= 800
+    assert win_h <= 600
+
+
+def test_videoresize_event_updates_playing_layout(
+    monkeypatch: MonkeyPatch,
+) -> None:
+    """VIDEORESIZE updates the layout while gameplay is active."""
+    game = _game_with_level()
+    game.state = GameState.PLAYING
+    resize_params: dict[str, int] = {}
+
+    def fake_resize_window(
+        max_w: int | None = None, max_h: int | None = None
+    ) -> None:
+        if max_w is not None:
+            resize_params["w"] = max_w
+        if max_h is not None:
+            resize_params["h"] = max_h
+
+    monkeypatch.setattr(game, "_resize_window", fake_resize_window)
+
+    event = pygame.event.Event(pygame.VIDEORESIZE, {"w": 1024, "h": 768})
+    game._handle_event(event)
+
+    assert resize_params == {"w": 1024, "h": 768}

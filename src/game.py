@@ -24,6 +24,9 @@ CELL_SIZE: int = 16
 HUD_HEIGHT: int = 48
 INITIAL_WIDTH: int = 800
 INITIAL_HEIGHT: int = 600
+MIN_CELL_SIZE: int = 1
+HUD_ROWS: int = 3
+MIN_HUD_HEIGHT: int = 24
 
 
 class GameState(Enum):
@@ -56,8 +59,11 @@ class Game:
         self._tick: int = 0
         self._highscores = load(config.highscore_filename)
         self._screen: pygame.Surface | None = None
+        self._cell_size = CELL_SIZE
         # UI objects — no pygame calls in __init__; safe to create here
-        self._renderer = Renderer(INITIAL_WIDTH, INITIAL_HEIGHT, CELL_SIZE)
+        self._renderer = Renderer(
+            INITIAL_WIDTH, INITIAL_HEIGHT, self._cell_size
+        )
         self._menu = MainMenu()
         self._hud = HUD()
         self._pause = PauseMenu()
@@ -100,6 +106,13 @@ class Game:
     def _handle_event(self, event: pygame.event.Event) -> None:
         if event.type == pygame.QUIT:
             self.state = GameState.QUIT
+            return
+        if (
+            event.type == pygame.VIDEORESIZE
+            and self.level is not None
+            and self.state in (GameState.PLAYING, GameState.PAUSED)
+        ):
+            self._resize_window(max_w=event.w, max_h=event.h)
             return
         if event.type == pygame.KEYDOWN:
             self._handle_keydown(event.key)
@@ -200,13 +213,41 @@ class Game:
             self.level.grid_height,
         )
 
-    def _resize_window(self) -> None:
+    def _compute_responsive_layout(
+        self, grid_w: int, grid_h: int, max_w: int, max_h: int
+    ) -> tuple[int, int, int, int]:
+        max_w = max(1, max_w)
+        max_h = max(1, max_h)
+        cell_by_w = max_w // max(1, grid_w)
+        cell_by_h = max_h // max(1, grid_h + HUD_ROWS)
+        cell_by_h_with_min_hud = (
+            max_h - MIN_HUD_HEIGHT
+        ) // max(1, grid_h)
+        cell_size = max(
+            MIN_CELL_SIZE,
+            min(cell_by_w, cell_by_h, cell_by_h_with_min_hud),
+        )
+        hud_height = max(MIN_HUD_HEIGHT, cell_size * HUD_ROWS)
+        content_h = grid_h * cell_size + hud_height
+        window_w = min(max_w, grid_w * cell_size)
+        window_h = min(max_h, content_h)
+        return cell_size, hud_height, window_w, window_h
+
+    def _resize_window(
+        self, max_w: int | None = None, max_h: int | None = None
+    ) -> None:
         if self.level is None:
             return
-        w = self.level.grid_width * CELL_SIZE
-        h = self.level.grid_height * CELL_SIZE + HUD_HEIGHT
-        self._screen = pygame.display.set_mode((w, h))
-        self._renderer = Renderer(w, h, CELL_SIZE)
+        if max_w is None or max_h is None:
+            info = pygame.display.Info()
+            max_w = info.current_w if info.current_w > 0 else INITIAL_WIDTH
+            max_h = info.current_h if info.current_h > 0 else INITIAL_HEIGHT
+        cell_size, _, w, h = self._compute_responsive_layout(
+            self.level.grid_width, self.level.grid_height, max_w, max_h
+        )
+        self._cell_size = cell_size
+        self._screen = pygame.display.set_mode((w, h), pygame.RESIZABLE)
+        self._renderer = Renderer(w, h, self._cell_size)
 
     def _level_cfg(self, index: int) -> LevelConfig:
         if index < len(self.config.levels):
@@ -234,7 +275,10 @@ class Game:
         self._screen = pygame.display.set_mode(
             (INITIAL_WIDTH, INITIAL_HEIGHT), pygame.RESIZABLE
         )
-        self._renderer = Renderer(INITIAL_WIDTH, INITIAL_HEIGHT, CELL_SIZE)
+        self._cell_size = CELL_SIZE
+        self._renderer = Renderer(
+            INITIAL_WIDTH, INITIAL_HEIGHT, self._cell_size
+        )
         self.state = GameState.MAIN_MENU
 
     # ------------------------------------------------------------------
@@ -251,7 +295,7 @@ class Game:
         elif self.state == GameState.PAUSED:
             if self.level is not None:
                 self._renderer.draw_level(screen, self.level, self._tick)
-                hud_y = self.level.grid_height * CELL_SIZE
+                hud_y = self.level.grid_height * self._cell_size
                 self._hud.render(
                     screen,
                     self.level.player.score,
@@ -303,7 +347,7 @@ class Game:
                 return
 
         self._renderer.draw_level(screen, self.level, self._tick)
-        hud_y = self.level.grid_height * CELL_SIZE
+        hud_y = self.level.grid_height * self._cell_size
         self._hud.render(
             screen,
             self.level.player.score,
