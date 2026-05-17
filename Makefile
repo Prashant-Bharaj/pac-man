@@ -1,7 +1,7 @@
 .PHONY: install run debug clean lint lint-strict test dist
 
 # All project source files
-SRC = pac-man.py \
+SRC = main.py \
       src/__init__.py \
       src/config.py \
       src/game.py \
@@ -33,10 +33,10 @@ install:
 	uv sync --all-groups
 
 run:
-	uv run python pac-man.py config.json
+	uv run python main.py config.json
 
 debug:
-	uv run python -m pdb pac-man.py config.json
+	uv run python -m pdb main.py config.json
 
 dist:
 	uv run pyinstaller pac-man.spec
