@@ -59,7 +59,7 @@ class MainMenu:
             ("", _GRAY),
             ("Cheats (during game):", _GRAY),
             ("  I = invincible   F = freeze ghosts", _GRAY),
-            ("  S = speed boost  L = extra life   N = skip level", _GRAY),
+            ("  B = speed boost  L = extra life   N = skip level", _GRAY),
         ]
         y = h // 4
         for text, color in controls:
