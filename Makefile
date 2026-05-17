@@ -24,6 +24,7 @@ SRC = pac-man.py \
       tests/test_config.py \
       tests/test_highscore.py \
       tests/test_game_input.py \
+      tests/test_menu.py \
       tests/test_maze.py \
       tests/test_entities.py \
       tests/test_level.py
