@@ -15,7 +15,7 @@ def test():
     corridor_count = 0
     for row in maze:
         for cell in row:
-            if cell == CellType.WALL:
+            if cell in (CellType.WALL, CellType.BLOCK):
                 wall_count += 1
             else:
                 corridor_count += 1

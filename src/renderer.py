@@ -101,19 +101,85 @@ class Renderer:
                 (level.grid_width * cell_size, level.grid_height * cell_size)
             )
             surf.fill(_FLOOR)
+            
+            # Pass 1: Draw base cells with neighbor-aware rounded corners
+            rad = max(1, cell_size // 4)
+            in_rad = max(1, rad - 1)
+            
             for row in range(level.grid_height):
                 for col in range(level.grid_width):
-                    if level.grid[row][col] == CellType.WALL:
+                    cell = level.grid[row][col]
+                    if cell in (CellType.WALL, CellType.BLOCK):
                         rx, ry = col * cell_size, row * cell_size
+                        
+                        # Check neighbors of the SAME type
+                        up = row > 0 and level.grid[row - 1][col] == cell
+                        down = row < level.grid_height - 1 and level.grid[row + 1][col] == cell
+                        left = col > 0 and level.grid[row][col - 1] == cell
+                        right = col < level.grid_width - 1 and level.grid[row][col + 1] == cell
+                        
+                        # Only round corners that are "outer" boundaries of the structure
+                        tl = rad if not up and not left else 0
+                        tr = rad if not up and not right else 0
+                        bl = rad if not down and not left else 0
+                        br = rad if not down and not right else 0
+
                         pygame.draw.rect(
-                            surf, _WALL, (rx, ry, cell_size, cell_size)
+                            surf, _WALL, (rx, ry, cell_size, cell_size),
+                            border_top_left_radius=tl,
+                            border_top_right_radius=tr,
+                            border_bottom_left_radius=bl,
+                            border_bottom_right_radius=br
                         )
+                        
                         if cell_size >= 8:
+                            inner_color = (
+                                _WALL_INNER if cell == CellType.BLOCK
+                                else _FLOOR
+                            )
+                            itl = in_rad if not up and not left else 0
+                            itr = in_rad if not up and not right else 0
+                            ibl = in_rad if not down and not left else 0
+                            ibr = in_rad if not down and not right else 0
+                            
                             pygame.draw.rect(
                                 surf,
-                                _WALL_INNER,
+                                inner_color,
                                 (rx + 1, ry + 1, cell_size - 2, cell_size - 2),
+                                border_top_left_radius=itl,
+                                border_top_right_radius=itr,
+                                border_bottom_left_radius=ibl,
+                                border_bottom_right_radius=ibr
                             )
+            
+            # Pass 2: Draw bridges between adjacent cells of the SAME type
+            if cell_size >= 8:
+                for row in range(level.grid_height):
+                    for col in range(level.grid_width):
+                        cell = level.grid[row][col]
+                        if cell not in (CellType.WALL, CellType.BLOCK):
+                            continue
+                        
+                        rx, ry = col * cell_size, row * cell_size
+                        inner_color = _WALL_INNER if cell == CellType.BLOCK else _FLOOR
+                        
+                        right_match = col < level.grid_width - 1 and level.grid[row][col + 1] == cell
+                        down_match = row < level.grid_height - 1 and level.grid[row + 1][col] == cell
+                        diag_match = right_match and down_match and level.grid[row + 1][col + 1] == cell
+
+                        if right_match:
+                            pygame.draw.rect(
+                                surf, inner_color, (rx + cell_size - 1, ry + 1, 2, cell_size - 2)
+                            )
+                        if down_match:
+                            pygame.draw.rect(
+                                surf, inner_color, (rx + 1, ry + cell_size - 1, cell_size - 2, 2)
+                            )
+                        if diag_match:
+                            pygame.draw.rect(
+                                surf, inner_color, (rx + cell_size - 1, ry + cell_size - 1, 2, 2)
+                            )
+
             self._maze_surface = surf
             self._maze_grid_id = grid_id
         screen.blit(self._maze_surface, (0, 0))

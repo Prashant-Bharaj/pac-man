@@ -10,7 +10,10 @@ def test_sizes():
             print(f"Requested {w}x{h}, got {mw}x{mh}")
             
             # Check for fallback
-            wall_count = sum(row.count(CellType.WALL) for row in maze)
+            wall_count = sum(
+                sum(1 for cell in row if cell in (CellType.WALL, CellType.BLOCK))
+                for row in maze
+            )
             expected_fallback_walls = (2*w + 1) * 2 + (2*h + 1 - 2) * 2
             if wall_count == expected_fallback_walls:
                 print(f"  Result: FALLBACK (wall count {wall_count})")

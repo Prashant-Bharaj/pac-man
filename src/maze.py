@@ -28,6 +28,7 @@ class CellType(Enum):
 
     WALL = 0
     CORRIDOR = 1
+    BLOCK = 2
 
 
 MazeGrid = list[list[CellType]]
@@ -113,6 +114,12 @@ def _expand(cell_grid: list[list[int]], width: int, height: int) -> MazeGrid:
             pc = 2 * c + 1
 
             if cell == _ALL_WALLS:
+                # Fill the 3x3 logical cell block with BLOCK type
+                for dr in [-1, 0, 1]:
+                    for dc in [-1, 0, 1]:
+                        gr, gc = pr + dr, pc + dc
+                        if 0 <= gr < rows and 0 <= gc < cols:
+                            grid[gr][gc] = CellType.BLOCK
                 continue
 
             grid[pr][pc] = CellType.CORRIDOR

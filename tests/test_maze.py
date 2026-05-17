@@ -152,10 +152,11 @@ def test_fallback_maze_interior_corridors() -> None:
 
 
 def test_expand_preserves_fully_blocked_cell() -> None:
-    """A fully closed package cell remains a wall in the expanded maze."""
+    """A fully closed package cell remains a block in the expanded maze."""
     maze = _expand([[0b1111]], width=1, height=1)
-    assert maze[1][1] == CellType.WALL
-    assert maze[0][0] == CellType.WALL
+    assert maze[1][1] == CellType.BLOCK
+    assert maze[0][0] == CellType.BLOCK
+    assert maze[2][2] == CellType.BLOCK
 
 
 def test_expand_opens_passage_when_shared_wall_is_absent() -> None:
@@ -191,7 +192,7 @@ def test_generate_visible_maze_preserves_42_pattern() -> None:
             grid_y = 2 * (pattern_y + y) + 1
             grid_x = 2 * (pattern_x + x) + 1
             if value:
-                assert maze[grid_y][grid_x] == CellType.WALL
+                assert maze[grid_y][grid_x] == CellType.BLOCK
             elif maze[grid_y][grid_x] == CellType.CORRIDOR:
                 open_pattern_centres += 1
 
