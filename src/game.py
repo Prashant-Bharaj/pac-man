@@ -140,7 +140,7 @@ class Game:
             self.cheat.toggle_invincible()
         elif key == pygame.K_f:
             self.cheat.toggle_ghost_freeze()
-        elif key == pygame.K_s:
+        elif key == pygame.K_b:
             self.cheat.toggle_speed_boost()
         elif key == pygame.K_l:
             self.level.player.lives += 1

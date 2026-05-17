@@ -83,7 +83,7 @@ Removes `__pycache__`, `.mypy_cache`, `.pytest_cache`, and compiled Python files
 |-----|--------|
 | `I` | Toggle invincibility (ghosts cannot kill you) |
 | `F` | Toggle ghost freeze (ghosts stop moving) |
-| `S` | Toggle speed boost (faster movement) |
+| `B` | Toggle speed boost (faster movement) |
 | `L` | Add an extra life |
 | `N` | Skip to the next level immediately |
 
