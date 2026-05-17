@@ -9,7 +9,7 @@ import json
 import logging
 from typing import Any
 
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, Field, ValidationError, field_validator
 
 logger = logging.getLogger(__name__)
 
@@ -194,20 +194,31 @@ class GameConfig(BaseModel):
     @field_validator("levels", mode="before")
     @classmethod
     def validate_levels(cls, v: Any) -> list[Any]:
-        """Fall back to 10 default levels if array is missing or empty.
+        """Validate level entries and replace invalid items with defaults.
 
         Args:
             v: Raw field value.
 
         Returns:
-            List of level dicts (may be empty list for default handling).
+            List of level dicts or LevelConfig instances.
         """
         if not isinstance(v, list) or not v:
             logger.warning(
                 "Config 'levels' is missing or empty, using 10 default levels"
             )
             return [{}] * 10
-        return v
+
+        levels: list[Any] = []
+        for index, item in enumerate(v):
+            if isinstance(item, (dict, LevelConfig)):
+                levels.append(item)
+            else:
+                logger.warning(
+                    "Config 'levels[%d]' is invalid, using default level",
+                    index,
+                )
+                levels.append({})
+        return levels
 
 
 def load_config(path: str) -> GameConfig:
@@ -245,4 +256,12 @@ def load_config(path: str) -> GameConfig:
         )
         return GameConfig(levels=[LevelConfig() for _ in range(10)])
 
-    return GameConfig.model_validate(data)
+    try:
+        return GameConfig.model_validate(data)
+    except ValidationError as exc:
+        logger.error(
+            "Config '%s' has invalid values: %s — using all defaults",
+            path,
+            exc,
+        )
+        return GameConfig(levels=[LevelConfig() for _ in range(10)])
