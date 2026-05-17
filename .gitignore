@@ -49,7 +49,8 @@ Thumbs.db
 # Game runtime files
 highscores.json
 
-.claude/
-
-# Graphify output
 graphify-out/
+docs/   
+.claude/
+.cursor/
+
