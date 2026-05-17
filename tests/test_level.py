@@ -1,8 +1,11 @@
 """Tests for Level setup, update loop, and collision logic."""
 
+from collections import deque
+
 from src.cheat import CheatMode
 from src.config import GameConfig
 from src.level import Level, LevelEvent
+from src.maze import CellType, is_corridor
 
 
 # ---------------------------------------------------------------------------
@@ -35,6 +38,32 @@ def _level(**kwargs: object) -> Level:
 
 def _no_cheat() -> CheatMode:
     return CheatMode()
+
+
+def _reachable_from_player(lv: Level) -> set[tuple[int, int]]:
+    """Return all corridors connected to the player's position."""
+    start = (lv.player.x, lv.player.y)
+    if not is_corridor(lv.grid, *start):
+        return set()
+
+    reachable = {start}
+    queue: deque[tuple[int, int]] = deque([start])
+    while queue:
+        x, y = queue.popleft()
+        for nx, ny in (
+            (x + 1, y),
+            (x - 1, y),
+            (x, y + 1),
+            (x, y - 1),
+        ):
+            if (
+                (nx, ny) in reachable
+                or not is_corridor(lv.grid, nx, ny)
+            ):
+                continue
+            reachable.add((nx, ny))
+            queue.append((nx, ny))
+    return reachable
 
 
 # ---------------------------------------------------------------------------
@@ -90,6 +119,74 @@ class TestLevelConstruction:
     def test_time_remaining_set_from_config(self) -> None:
         lv = _level(level_max_time=60)
         assert lv.time_remaining == 60.0
+
+    def test_config_size_is_exact_visible_grid_size(self) -> None:
+        for width, height in [
+            (7, 7),
+            (8, 8),
+            (10, 10),
+            (10, 13),
+            (13, 10),
+            (20, 20),
+            (21, 21),
+            (101, 102),
+        ]:
+            lv = _level(levels=[{
+                "width": width,
+                "height": height,
+                "seed": 1,
+            }])
+            assert lv.grid_width == width
+            assert lv.grid_height == height
+            from src.maze import is_corridor
+            assert is_corridor(lv.grid, lv.player.x, lv.player.y)
+            assert len(lv.ghosts) == 4
+
+    def test_large_maze_player_starts_between_4_and_2(self) -> None:
+        width = 50
+        height = 50
+        lv = _level(levels=[{
+            "width": width,
+            "height": height,
+            "seed": 1,
+        }])
+        logical_width = (width - 1) // 2
+        logical_height = (height - 1) // 2
+        pattern_x = int((logical_width - 7) / 2)
+        pattern_y = int((logical_height - 5) / 2)
+
+        assert (lv.player.x, lv.player.y) == (
+            2 * (pattern_x + 3) + 1,
+            2 * (pattern_y + 1) + 1,
+        )
+        assert is_corridor(lv.grid, lv.player.x, lv.player.y)
+        assert any(
+            is_corridor(lv.grid, lv.player.x + dx, lv.player.y + dy)
+            for dx, dy in [(1, 0), (-1, 0), (0, 1), (0, -1)]
+        )
+
+    def test_all_remaining_corridors_are_reachable(self) -> None:
+        lv = _level(levels=[{
+            "width": 50,
+            "height": 50,
+            "seed": 1,
+        }])
+        reachable = _reachable_from_player(lv)
+
+        for y, row in enumerate(lv.grid):
+            for x, cell in enumerate(row):
+                if cell == CellType.CORRIDOR:
+                    assert (x, y) in reachable
+
+    def test_all_pellets_are_reachable(self) -> None:
+        lv = _level(levels=[{
+            "width": 50,
+            "height": 50,
+            "seed": 1,
+        }])
+        reachable = _reachable_from_player(lv)
+
+        assert all((pellet.x, pellet.y) in reachable for pellet in lv.pellets)
 
 
 # ---------------------------------------------------------------------------

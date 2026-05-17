@@ -18,7 +18,7 @@
 
   # Level definitions (at least 10 required)
   "levels": [
-    { "width": 20, "height": 20, "seed": 42 },
+    { "width": 50, "height": 50, "seed": 42 },
     { "width": 21, "height": 21 },
     { "width": 22, "height": 22 },
     { "width": 23, "height": 23 },
