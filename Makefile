@@ -5,36 +5,6 @@ PKG_NAME  = pac-man-$(VERSION)
 PKG_DIR   = pkg/$(PKG_NAME)
 PKG_ZIP   = pkg/$(PKG_NAME).zip
 
-# All project source files
-SRC = pac-man.py \
-      src/__init__.py \
-      src/config.py \
-      src/game.py \
-      src/level.py \
-      src/maze.py \
-      src/renderer.py \
-      src/cheat.py \
-      src/highscore.py \
-      src/entities/__init__.py \
-      src/entities/player.py \
-      src/entities/ghost.py \
-      src/entities/pellet.py \
-      src/ui/__init__.py \
-      src/ui/menu.py \
-      src/ui/hud.py \
-      src/ui/pause.py \
-      src/ui/gameover.py \
-      src/ui/victory.py \
-      tests/__init__.py \
-      tests/test_config.py \
-      tests/test_entrypoint.py \
-      tests/test_highscore.py \
-      tests/test_game_input.py \
-      tests/test_menu.py \
-      tests/test_maze.py \
-      tests/test_entities.py \
-      tests/test_level.py
-
 install:
 	uv sync --all-groups
 
@@ -66,14 +36,14 @@ clean:
 	rm -rf pkg/
 
 lint:
-	uv run flake8 $(SRC)
-	uv run mypy $(SRC) --warn-return-any --warn-unused-ignores \
+	uv run flake8 .
+	uv run mypy . --warn-return-any --warn-unused-ignores \
 		--ignore-missing-imports --disallow-untyped-defs \
 		--check-untyped-defs
 
 lint-strict:
-	uv run flake8 $(SRC)
-	uv run mypy $(SRC) --strict
+	uv run flake8 .
+	uv run mypy . --strict
 
 test:
 	uv run pytest tests/ -v
