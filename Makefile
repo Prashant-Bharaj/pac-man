@@ -27,6 +27,7 @@ SRC = pac-man.py \
       src/ui/victory.py \
       tests/__init__.py \
       tests/test_config.py \
+      tests/test_entrypoint.py \
       tests/test_highscore.py \
       tests/test_game_input.py \
       tests/test_menu.py \

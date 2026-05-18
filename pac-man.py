@@ -5,30 +5,59 @@ Usage:
 """
 
 import asyncio
-import os
+import json
 import sys
 
-from src.config import load_config
-from src.game import Game
+
+def _strip_comment_lines(text: str) -> str:
+    """Remove config comment lines before syntax preflight."""
+    lines = []
+    for line in text.splitlines():
+        stripped = line.lstrip()
+        if not stripped.startswith("#") and not stripped.startswith("//"):
+            lines.append(line)
+    return "\n".join(lines)
 
 
-def _default_config_path() -> str:
-    # When frozen by PyInstaller, _MEIPASS is the temp bundle directory.
-    base = getattr(sys, "_MEIPASS", os.path.dirname(os.path.abspath(__file__)))
-    return os.path.join(base, "config.json")
+def _preflight_config_file(path: str) -> None:
+    """Fail early for unreadable or syntactically invalid config files."""
+    try:
+        with open(path, "r", encoding="utf-8") as fh:
+            raw_text = fh.read()
+    except OSError as exc:
+        print(f"Error: Cannot open config '{path}': {exc}")
+        sys.exit(1)
+
+    try:
+        data = json.loads(_strip_comment_lines(raw_text))
+    except json.JSONDecodeError as exc:
+        print(f"Error: Config '{path}' is not valid JSON: {exc}")
+        sys.exit(1)
+
+    if not isinstance(data, dict):
+        print(f"Error: Config '{path}' must be a JSON object")
+        sys.exit(1)
 
 
 async def main() -> None:
     """Parse arguments, load config, and launch the game."""
-    if len(sys.argv) == 1:
-        config_path = _default_config_path()
-    elif len(sys.argv) == 2:
-        config_path = sys.argv[1]
-    else:
+    if len(sys.argv) != 2:
         print("Usage: python3 pac-man.py config.json")
         sys.exit(1)
 
-    config = load_config(config_path)
+    config_path = sys.argv[1]
+    _preflight_config_file(config_path)
+
+    from src.config import ConfigLoadError, load_config
+
+    try:
+        config = load_config(config_path)
+    except ConfigLoadError as exc:
+        print(f"Error: {exc}")
+        sys.exit(1)
+
+    from src.game import Game
+
     game = Game(config)
     game.run()
 

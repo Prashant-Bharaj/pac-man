@@ -2,7 +2,8 @@
 
 Parses a JSON config file (with # comment support) into validated
 Pydantic models. Invalid values are clamped to safe defaults via
-field validators. Never raises on bad input.
+field validators. Invalid or unreadable config files raise a clean
+ConfigLoadError for the entrypoint to report without a traceback.
 """
 
 import json
@@ -12,6 +13,10 @@ from typing import Any
 from pydantic import BaseModel, Field, ValidationError, field_validator
 
 logger = logging.getLogger(__name__)
+
+
+class ConfigLoadError(Exception):
+    """Raised when the config file itself cannot be loaded."""
 
 
 def _strip_comments(text: str) -> str:
@@ -224,37 +229,38 @@ class GameConfig(BaseModel):
 def load_config(path: str) -> GameConfig:
     """Load and validate a game config file.
 
-    Invalid values are clamped to safe defaults with a log warning.
-    Unknown keys are silently ignored. Never raises on bad input.
+    Invalid values inside a readable JSON object are clamped to safe
+    defaults with a log warning. Unknown keys are silently ignored.
 
     Args:
         path: Path to the JSON config file (# comments supported).
 
     Returns:
         A fully validated GameConfig instance.
+
+    Raises:
+        ConfigLoadError: If the file cannot be read, parsed, or if the
+            JSON root is not an object.
     """
     try:
         with open(path, "r", encoding="utf-8") as fh:
             raw_text = fh.read()
     except OSError as exc:
-        logger.error(
-            "Cannot open config '%s': %s — using all defaults", path, exc
-        )
-        return GameConfig(levels=[LevelConfig() for _ in range(10)])
+        raise ConfigLoadError(
+            f"Cannot open config '{path}': {exc}"
+        ) from exc
 
     try:
         data: Any = json.loads(_strip_comments(raw_text))
     except json.JSONDecodeError as exc:
-        logger.error(
-            "Config '%s' is not valid JSON: %s — using all defaults", path, exc
-        )
-        return GameConfig(levels=[LevelConfig() for _ in range(10)])
+        raise ConfigLoadError(
+            f"Config '{path}' is not valid JSON: {exc}"
+        ) from exc
 
     if not isinstance(data, dict):
-        logger.error(
-            "Config '%s' must be a JSON object — using all defaults", path
+        raise ConfigLoadError(
+            f"Config '{path}' must be a JSON object"
         )
-        return GameConfig(levels=[LevelConfig() for _ in range(10)])
 
     try:
         return GameConfig.model_validate(data)

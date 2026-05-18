@@ -109,7 +109,13 @@ The game is configured via a JSON file passed as a command-line argument:
 uv run python pac-man.py config.json
 ```
 
-The config file supports `#` and `//` comment lines (stripped before parsing). All keys are optional — missing or invalid values fall back to safe defaults without crashing.
+The config path is mandatory. If the file cannot be opened, is not valid JSON,
+or does not contain a JSON object at the root, the program prints a clear error
+and exits without a traceback.
+
+The config file supports `#` and `//` comment lines (stripped before parsing).
+Inside a valid JSON object, all keys are optional — missing or invalid values
+fall back to safe defaults without crashing.
 
 ### Keys
 
