@@ -32,7 +32,7 @@ This runs `uv sync --all-groups`, creating a `.venv` and installing all runtime 
 ```bash
 make run
 # or directly:
-uv run python pac-main.py config.json
+uv run python pac-man.py config.json
 ```
 
 The program takes exactly one argument: a path to a JSON configuration file.
@@ -106,7 +106,7 @@ Active cheats are shown in the HUD strip at the bottom of the screen.
 The game is configured via a JSON file passed as a command-line argument:
 
 ```bash
-uv run python pac-main.py config.json
+uv run python pac-man.py config.json
 ```
 
 The config file supports `#` and `//` comment lines (stripped before parsing). All keys are optional — missing or invalid values fall back to safe defaults without crashing.
@@ -236,7 +236,7 @@ MAIN_MENU → PLAYING → PAUSED ──────────→ PLAYING
 ## General Software Architecture
 
 ```
-pac-main.py                 # Entry point — parses args, loads config, starts Game
+pac-man.py                  # Entry point — parses args, loads config, starts Game
 │
 ├── src/config.py           # Pydantic models: GameConfig, LevelConfig
 │                           # load_config() — strips comments, validates, clamps

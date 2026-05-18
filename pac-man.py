@@ -1,7 +1,7 @@
 """Entry point for the Pac-Man game.
 
 Usage:
-    python3 main.py [config.json]
+    python3 pac-man.py config.json
 """
 
 import asyncio
@@ -25,7 +25,7 @@ async def main() -> None:
     elif len(sys.argv) == 2:
         config_path = sys.argv[1]
     else:
-        print("Usage: pac-man [config.json]")
+        print("Usage: python3 pac-man.py config.json")
         sys.exit(1)
 
     config = load_config(config_path)

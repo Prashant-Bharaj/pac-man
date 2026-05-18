@@ -7,7 +7,7 @@ INSTALL
 RUN
     make run
     # or directly:
-    uv run python pac-main.py config.json
+    uv run python pac-man.py config.json
 
 CONTROLS
   In-game:
@@ -28,7 +28,7 @@ CONTROLS
 
 CONFIGURATION
     Pass a JSON config file as the argument:
-        uv run python pac-main.py config.json
+        uv run python pac-man.py config.json
 
     All keys are optional and fall back to safe defaults.
 

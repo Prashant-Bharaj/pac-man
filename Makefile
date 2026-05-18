@@ -6,7 +6,7 @@ PKG_DIR   = pkg/$(PKG_NAME)
 PKG_ZIP   = pkg/$(PKG_NAME).zip
 
 # All project source files
-SRC = pac-main.py \
+SRC = pac-man.py \
       src/__init__.py \
       src/config.py \
       src/game.py \
@@ -38,15 +38,15 @@ install:
 	uv sync --all-groups
 
 run:
-	uv run python pac-main.py config.json
+	uv run python pac-man.py config.json
 
 debug:
-	uv run python -m pdb pac-main.py config.json
+	uv run python -m pdb pac-man.py config.json
 
 package:
 	rm -rf pkg/
 	mkdir -p pkg/$(PKG_NAME)
-	cp pac-main.py Makefile pyproject.toml uv.lock config.json \
+	cp pac-man.py Makefile pyproject.toml uv.lock config.json \
 	   mazegenerator-2.0.1-py3-none-any.whl README.txt \
 	   pkg/$(PKG_NAME)/
 	cp -r src tests pkg/$(PKG_NAME)/
