@@ -250,7 +250,9 @@ class Game:
 
         elif self.state == GameState.PAUSED:
             if self.level is not None:
-                self._renderer.draw_level(screen, self.level, self._tick, self.cheat.invincible)
+                self._renderer.draw_level(
+                    screen, self.level, self._tick, self.cheat.invincible
+                )
                 hud_y = self.level.grid_height * CELL_SIZE
                 self._hud.render(
                     screen,
@@ -302,7 +304,9 @@ class Game:
                 self.state = GameState.GAME_OVER
                 return
 
-        self._renderer.draw_level(screen, self.level, self._tick, self.cheat.invincible)
+        self._renderer.draw_level(
+            screen, self.level, self._tick, self.cheat.invincible
+        )
         hud_y = self.level.grid_height * CELL_SIZE
         self._hud.render(
             screen,
