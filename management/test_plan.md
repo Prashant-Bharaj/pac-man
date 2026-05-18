@@ -14,13 +14,16 @@ The project utilizes a multi-layered testing approach to ensure stability and co
 
 | Module | Test File | Cases | Key Features Verified |
 | :--- | :--- | :--- | :--- |
-| **Config** | `tests/test_config.py` | 8 | Valid JSON loading, comment stripping, field clamping, and default fallbacks. |
+| **Config** | `tests/test_config.py` | 16 | Valid JSON loading, launch errors, comment stripping, field clamping, and default fallbacks. |
+| **Entrypoint** | `tests/test_entrypoint.py` | 4 | CLI argument validation and clean config-file error handling. |
 | **Highscore** | `tests/test_highscore.py` | 9 | Persistent CRUD operations, name validation, top-10 sorting, and corruption recovery. |
-| **Maze** | `tests/test_maze.py` | 14 | Expanded grid dimensions, wall/corridor bitmask conversion, and deterministic seeds. |
+| **Maze** | `tests/test_maze.py`, `tests/test_maze_gen.py`, `tests/test_maze_sizes.py` | 24 | Expanded grid dimensions, wall/corridor bitmask conversion, deterministic seeds, and generator smoke checks. |
 | **Entities** | `tests/test_entities.py` | 35 | Player grid movement, Ghost BFS pathfinding, and Pellet state machine logic. |
 | **Level** | `tests/test_level.py` | 31 | Full level update cycle, collision detection events, and level timer logic. |
+| **Game Input** | `tests/test_game_input.py` | 4 | Keyboard input routing for movement, cheats, and menu actions. |
+| **Menu** | `tests/test_menu.py` | 7 | Main menu navigation, highscore view, instructions view, start, and exit actions. |
 
-**Total Tests:** 97 passing.
+**Total Tests:** 131 passing.
 
 ## 3. Manual Verification (Cheat Mode)
 
@@ -28,7 +31,7 @@ To verify behaviors that are harder to unit test (e.g., visual rendering, HUD ac
 
 *   `I` (Invincibility): Verify that collision with ghosts does not trigger the `PLAYER_HIT` event.
 *   `F` (Ghost Freeze): Verify that ghost position updates are correctly skipped in the update loop.
-*   `S` (Speed Boost): Verify that Pac-Man's movement interval is reduced as expected.
+*   `B` (Speed Boost): Verify that Pac-Man's movement interval is reduced as expected.
 *   `L` (Extra Life): Verify that life increments correctly in the HUD.
 *   `N` (Next Level): Verify the smooth transition between levels and the carryover of score and lives.
 
