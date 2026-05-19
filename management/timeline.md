@@ -12,7 +12,7 @@ This document outlines the chronological development of the Pac-Man project.
 | **Phase 6** | Renderer & UI | 6 Days | prasingh | Developed the Pygame-based Renderer, animated sprites, HUD, and all menu screens (Main, Pause, GameOver, Victory). |
 | **Phase 7** | Highscore System | 3 Days | msantos2 | Implemented persistent JSON-based highscore storage with validation and top-10 sorting. |
 | **Phase 8** | Cheat Mode & Polish | 2 Days | prasingh, msantos2 | Integrated all 5 cheat keys, added HUD indicators, and performed final bug fixes and performance tuning. |
-| **Phase 9** | Packaging & Deployment | 1 Day | msantos2 | Created the PyInstaller specification (`pac-man.spec`) and prepared the project for deployment. |
+| **Phase 9** | Packaging & Deployment | 1 Day | msantos2 | Added the `make package` archive target, bundled the default configuration and in-package instructions, and prepared the build for deployment. |
 | **Phase 10** | Project Management | 1 Day | msantos2, prasingh | Generated project management documents, finalized the README, and completed codebase documentation. |
 
 ## Progress Summary

@@ -7,7 +7,7 @@ INSTALL
 RUN
     make run
     # or directly:
-    uv run python pac-main.py config.json
+    uv run python pac-man.py config.json
 
 CONTROLS
   In-game:
@@ -28,9 +28,13 @@ CONTROLS
 
 CONFIGURATION
     Pass a JSON config file as the argument:
-        uv run python pac-main.py config.json
+        uv run python pac-man.py config.json
 
-    All keys are optional and fall back to safe defaults.
+    The config path is mandatory. Missing files, invalid JSON, or
+    non-object JSON roots stop launch with a clear error and no traceback.
+
+    Inside a valid JSON object, all keys are optional and fall back to
+    safe defaults.
 
     Key                       Default   Notes
     highscore_filename        "highscores.json"

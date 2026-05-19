@@ -3,7 +3,9 @@
 import json
 from pathlib import Path
 
-from src.config import load_config, GameConfig
+import pytest
+
+from src.config import ConfigLoadError, load_config
 
 
 def write_config(tmp_path: Path, content: str) -> str:
@@ -36,19 +38,23 @@ def test_valid_config(tmp_path: Path) -> None:
 
 
 def test_missing_file() -> None:
-    """A missing config file returns default config without raising."""
-    cfg = load_config("/nonexistent/path/config.json")
-    assert isinstance(cfg, GameConfig)
-    assert cfg.lives == 3
-    assert len(cfg.levels) == 10
+    """A missing config file raises a clean load error."""
+    with pytest.raises(ConfigLoadError, match="Cannot open config"):
+        load_config("/nonexistent/path/config.json")
 
 
 def test_invalid_json(tmp_path: Path) -> None:
-    """A corrupt JSON file returns default config without raising."""
+    """A corrupt JSON file raises a clean load error."""
     path = write_config(tmp_path, "{ this is not json }")
-    cfg = load_config(path)
-    assert isinstance(cfg, GameConfig)
-    assert cfg.lives == 3
+    with pytest.raises(ConfigLoadError, match="is not valid JSON"):
+        load_config(path)
+
+
+def test_json_root_must_be_object(tmp_path: Path) -> None:
+    """A config file must contain a JSON object at the root."""
+    path = write_config(tmp_path, "[]")
+    with pytest.raises(ConfigLoadError, match="must be a JSON object"):
+        load_config(path)
 
 
 def test_comment_stripping(tmp_path: Path) -> None:
