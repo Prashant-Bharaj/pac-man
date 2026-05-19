@@ -242,53 +242,322 @@ The project uses both, each where it fits best.
 | 9 | Packaging and deployment — `make package` build distributed online | ✅ |
 | 10 | Project management documents | ✅ |
 
+## General Software Architecture
+
+The project is organised around a small state-machine application shell and a
+separate gameplay simulation model. `Game` owns the pygame loop, menus,
+transitions, scoring, and persistence. `Level` owns the live maze, player,
+ghosts, pellets, timer, and collision rules. Rendering is kept separate from
+simulation so gameplay can be tested without opening a pygame window.
+
+Read the diagrams from top-level ownership first, then startup flow, runtime
+state, gameplay events, rendering, persistence, and tests.
+
+### High-level module map
+
+```mermaid
+flowchart TD
+    CLI["pac-man.py<br/>CLI entrypoint"]
+    ConfigFile["config.json<br/>external settings"]
+    Config["src/config.py<br/>GameConfig + LevelConfig<br/>Pydantic validation"]
+    Game["src/game.py<br/>Game<br/>main loop + state machine"]
+    Level["src/level.py<br/>Level<br/>simulation + collisions"]
+    Maze["src/maze.py<br/>maze adapter<br/>A-Maze-ing integration"]
+    Entities["src/entities/*<br/>Player + Ghost + Pellet"]
+    Renderer["src/renderer.py<br/>Renderer<br/>maze + entities drawing"]
+    UI["src/ui/*<br/>menu, HUD, pause,<br/>game over, victory"]
+    Cheat["src/cheat.py<br/>CheatMode<br/>evaluation toggles"]
+    Highscore["src/highscore.py<br/>top-10 JSON persistence"]
+    Tests["tests/*<br/>unit + integration checks"]
+
+    ConfigFile --> CLI
+    CLI --> Config
+    Config --> Game
+    Game --> Level
+    Game --> Renderer
+    Game --> UI
+    Game --> Cheat
+    Game --> Highscore
+    Level --> Maze
+    Level --> Entities
+    Renderer --> Level
+    Tests -. verify .-> Config
+    Tests -. verify .-> Game
+    Tests -. verify .-> Level
+    Tests -. verify .-> Maze
+    Tests -. verify .-> Entities
+    Tests -. verify .-> Highscore
+```
+
+### Startup and configuration flow
+
+At launch, the entrypoint accepts exactly one argument: the JSON configuration
+path. It performs a syntax preflight so command-line errors produce clean
+messages, then delegates full validation to `src/config.py`.
+
+```mermaid
+flowchart LR
+    Args["CLI args<br/>python pac-man.py config.json"]
+    Preflight["pac-man.py<br/>open file, strip comment lines,<br/>check valid JSON object"]
+    Load["load_config(path)"]
+    Models["GameConfig<br/>LevelConfig"]
+    GameInit["Game(config)"]
+    Loop["Game.run()<br/>pygame loop"]
+
+    Args --> Preflight
+    Preflight --> Load
+    Load --> Models
+    Models --> GameInit
+    GameInit --> Loop
+```
+
+Configuration is treated as untrusted input. Missing values use defaults,
+unknown keys are ignored, and invalid numeric values are clamped to safe ranges.
+The generated `GameConfig` is the single source of truth for lives, scoring,
+level dimensions, seeds, timer length, and highscore file path.
+
 ### Game state machine
 
+`GameState` in `src/game.py` controls which input handler and renderer are
+active at any moment. Only `Game` changes top-level state; lower-level objects
+report events instead of directly switching screens.
+
+```mermaid
+stateDiagram-v2
+    [*] --> MAIN_MENU
+    MAIN_MENU --> PLAYING: Start Game
+    MAIN_MENU --> QUIT: Exit or window close
+
+    PLAYING --> PAUSED: P or ESC
+    PAUSED --> PLAYING: P or ESC
+    PAUSED --> MAIN_MENU: M
+
+    PLAYING --> PLAYING: Next level loaded
+    PLAYING --> GAME_OVER: lives reach 0 or timer ends
+    PLAYING --> VICTORY: final level complete
+
+    GAME_OVER --> MAIN_MENU: save or skip score
+    VICTORY --> MAIN_MENU: save or skip score
+
+    PLAYING --> QUIT: window close
+    PAUSED --> QUIT: window close
+    GAME_OVER --> QUIT: window close
+    VICTORY --> QUIT: window close
 ```
-MAIN_MENU → PLAYING → PAUSED ──────────→ PLAYING
-                    → GAME_OVER ────────→ MAIN_MENU  (with name entry)
-                    → LEVEL_COMPLETE ───→ PLAYING (next level)
-                                     └──→ VICTORY ──→ MAIN_MENU  (with name entry)
+
+### Gameplay update flow
+
+The frame loop runs at 60 FPS. During gameplay, keyboard input updates the
+player's queued direction or cheat flags. `Level.update()` advances the
+simulation and returns `LevelEvent` values. `Game` translates those events into
+score changes, level transitions, game over, or victory.
+
+```mermaid
+sequenceDiagram
+    participant Pygame
+    participant Game
+    participant Level
+    participant Player
+    participant Ghosts
+    participant Renderer
+    participant HUD
+
+    Pygame->>Game: events + delta time
+    Game->>Game: route input by GameState
+    Game->>Level: update(dt, cheat)
+    Level->>Player: set speed and move on grid
+    Level->>Ghosts: move chase, flee, wander, or respawn
+    Level->>Level: collect pellets and check collisions
+    Level-->>Game: LevelEvent list
+    Game->>Game: add score or change state
+    Game->>Renderer: draw_level(screen, level, tick)
+    Game->>HUD: render score, lives, level, timer, cheats
 ```
+
+Important event ownership:
+
+| Event | Produced by | Consumed by | Result |
+|-------|-------------|-------------|--------|
+| `PACGUM_EATEN` | `Level` | `Game` | Add normal pacgum points |
+| `SUPER_PACGUM_EATEN` | `Level` | `Game` | Score added by Game; edible state set by Level |
+| `GHOST_EATEN` | `Level` | `Game` | Add ghost points |
+| `PLAYER_HIT` | `Level` | `Game` | Life was lost; continue if still alive |
+| `GAME_OVER` | `Level` | `Game` | Open game-over score entry |
+| `LEVEL_COMPLETE` | `Level` | `Game` | Load next level or victory screen |
+| `TIMEOUT` | `Level` | `Game` | Open game-over score entry |
+
+### Level, maze, and entity model
+
+`Level` is the owner of all gameplay data for the current stage. It generates
+the maze, removes unreachable corridors, places the player, places four ghosts
+near reachable corners, and fills reachable corridors with pacgums.
+
+```mermaid
+flowchart TD
+    Level["Level"]
+    Grid["MazeGrid<br/>2D CellType list"]
+    Player["Player<br/>position, lives, score,<br/>direction queue"]
+    GhostList["4 Ghost objects"]
+    GhostState["GhostState<br/>CHASE / EDIBLE / RESPAWNING"]
+    Pellets["Pellet list<br/>PACGUM / SUPER_PACGUM"]
+    Events["LevelEvent list"]
+
+    Level --> Grid
+    Level --> Player
+    Level --> GhostList
+    Level --> Pellets
+    GhostList --> GhostState
+    Level --> Events
+```
+
+Ghost movement is intentionally simple and grid-based. Ghosts use BFS when they
+need a shortest path, flee by choosing the neighbour farthest from the player
+while edible, and temporarily disappear in `RESPAWNING` state after being eaten.
+
+### Maze generation pipeline
+
+The assigned `mazegenerator` package is isolated behind `src/maze.py`, so the
+rest of the game only depends on the project's own `MazeGrid` format.
+
+```mermaid
+flowchart LR
+    Visible["LevelConfig<br/>visible width + height"]
+    Logical["logical size<br/>(width - 1) // 2<br/>(height - 1) // 2"]
+    External["mazegenerator<br/>bitmask cell grid"]
+    Patch["performance patches<br/>skip shortest path<br/>iterative DFS"]
+    Expand["expand bitmasks<br/>to walls + corridors"]
+    Fit["fit to exact<br/>visible dimensions"]
+    Reachable["remove unreachable<br/>corridor islands"]
+    GameGrid["MazeGrid used by<br/>movement + rendering"]
+    Fallback["fallback open maze<br/>if generation fails"]
+
+    Visible --> Logical
+    Logical --> Patch
+    Patch --> External
+    External --> Expand
+    Expand --> Fit
+    Fit --> Reachable
+    Reachable --> GameGrid
+    External -. known errors .-> Fallback
+    Fallback --> GameGrid
+```
+
+The maze grid is shared by movement, collision, pellet placement, and drawing.
+`CellType.CORRIDOR` is walkable; `CellType.WALL` and `CellType.BLOCK` are not.
+
+### Rendering and UI
+
+Rendering reads state but does not own game rules. The maze is pre-rendered to a
+cached `pygame.Surface` when a level loads, then dynamic objects are drawn each
+frame on top of it.
+
+```mermaid
+flowchart TD
+    Screen["pygame display surface"]
+    GameRender["Game._update(...)"]
+    Renderer["Renderer.draw_level(...)"]
+    MazeSurface["cached maze surface"]
+    Dynamic["dynamic frame draw<br/>pellets, ghosts, player"]
+    UI["UI screens<br/>MainMenu / PauseMenu<br/>GameOver / Victory"]
+    HUD["HUD<br/>score, lives, timer, cheats"]
+
+    GameRender --> Renderer
+    Renderer --> MazeSurface
+    Renderer --> Dynamic
+    GameRender --> UI
+    GameRender --> HUD
+    MazeSurface --> Screen
+    Dynamic --> Screen
+    UI --> Screen
+    HUD --> Screen
+```
+
+### Persistence and verification
+
+Highscores are stored as a local JSON top-10 list. Loading is fail-safe: missing
+or corrupt files produce an empty list instead of crashing. Saving happens only
+after game over or victory name entry.
+
+```mermaid
+flowchart LR
+    GameStart["Game startup"]
+    LoadScores["highscore.load(path)"]
+    Scores["in-memory<br/>HighscoreEntry list"]
+    EndScreen["Game over or victory<br/>name entry"]
+    AddEntry["add_entry(...)<br/>validate, sort, keep top 10"]
+    SaveScores["highscore.save(path)"]
+    File["highscores.json"]
+
+    GameStart --> LoadScores
+    LoadScores --> Scores
+    File --> LoadScores
+    Scores --> EndScreen
+    EndScreen --> AddEntry
+    AddEntry --> SaveScores
+    SaveScores --> File
+```
+
+Tests mirror the architecture:
+
+| Area | Test files | What they verify |
+|------|------------|------------------|
+| Entrypoint/config | `test_entrypoint.py`, `test_config.py` | CLI errors, JSON parsing, comment stripping, validation, defaults |
+| Maze | `test_maze.py`, `test_maze_gen.py`, `test_maze_sizes.py` | dimensions, walls, corridors, deterministic seeds, fallback |
+| Gameplay model | `test_level.py`, `test_entities.py` | movement, BFS, pellets, timers, collisions, level events |
+| App/UI input | `test_game_input.py`, `test_menu.py` | keyboard routing, menu navigation, start/exit behavior |
+| Persistence | `test_highscore.py` | JSON load/save, validation, sorting, corrupt-file recovery |
 
 ---
 
-## General Software Architecture
+## Folder and File Structure
 
-```
-pac-man.py                  # Entry point — parses args, loads config, starts Game
+```text
+.
+├── pac-man.py                         # CLI entrypoint: validates args, loads config, starts Game
+├── config.json                        # Default game configuration used by make run
+├── pyproject.toml                     # Python version, runtime deps, dev deps, local wheel source
+├── Makefile                           # Install, run, debug, lint, test, package, clean commands
+├── mazegenerator-2.0.1-py3-none-any.whl
+│                                      # Assigned external maze generator dependency
+├── README.md                          # Main user, setup, architecture, and project documentation
 │
-├── src/config.py           # Pydantic models: GameConfig, LevelConfig
-│                           # load_config() — strips comments, validates, clamps
+├── src/                               # Runtime game package
+│   ├── config.py                      # Pydantic config models and JSON loading
+│   ├── game.py                        # Top-level pygame loop and GameState transitions
+│   ├── level.py                       # Level setup, entity placement, update loop, collisions
+│   ├── maze.py                        # A-Maze-ing adapter and MazeGrid helpers
+│   ├── renderer.py                    # Pygame drawing for maze, pellets, ghosts, player
+│   ├── highscore.py                   # Persistent top-10 JSON highscore storage
+│   ├── cheat.py                       # CheatMode flags and HUD labels
+│   ├── entities/                      # Gameplay objects owned by Level
+│   │   ├── player.py                  # Pac-Man movement, lives, score
+│   │   ├── ghost.py                   # Ghost AI and CHASE/EDIBLE/RESPAWNING states
+│   │   └── pellet.py                  # Pacgum and super-pacgum data model
+│   └── ui/                            # Screen and overlay renderers
+│       ├── menu.py                    # Main menu, highscores view, instructions view
+│       ├── hud.py                     # Score, lives, timer, level, active cheats
+│       ├── pause.py                   # Pause overlay
+│       ├── gameover.py                # Game-over score entry screen
+│       └── victory.py                 # Victory score entry screen
 │
-├── src/game.py             # Game — state machine + main pygame loop (60 FPS)
-│   ├── src/level.py        # Level — maze generation, entity placement, update loop
-│   ├── src/renderer.py     # Renderer — maze, animated player/ghosts, pellets
-│   ├── src/cheat.py        # CheatMode — toggleable flags (invincible/freeze/speed/…)
-│   └── src/ui/
-│       ├── menu.py         # MainMenu — title, controls, top-10 highscores
-│       ├── hud.py          # HUD — score, life icons, level, timer, active cheats
-│       ├── pause.py        # PauseMenu — semi-transparent overlay
-│       ├── gameover.py     # GameOverScreen — score + name entry
-│       └── victory.py      # VictoryScreen — final score + name entry
+├── tests/                             # Pytest test suite
+│   ├── test_config.py                 # Config parsing, defaults, clamping, errors
+│   ├── test_entrypoint.py             # CLI argument and config-file error handling
+│   ├── test_entities.py               # Player, Ghost, Pellet behavior
+│   ├── test_game_input.py             # Gameplay and menu keyboard routing
+│   ├── test_highscore.py              # Highscore load/save/add validation
+│   ├── test_level.py                  # Level setup, timer, pellets, collisions, cheats
+│   ├── test_maze.py                   # Maze expansion, walls, corridors, fallback
+│   ├── test_maze_gen.py               # Assigned generator integration smoke test
+│   ├── test_maze_sizes.py             # Maze sizing behavior
+│   └── test_menu.py                   # Main menu navigation and actions
 │
-├── src/entities/
-│   ├── player.py           # Player — delta-time movement, queued direction, lives
-│   ├── ghost.py            # Ghost — CHASE/EDIBLE/RESPAWNING state machine + BFS AI (O(n) memory)
-│   └── pellet.py           # Pellet — pacgum / super-pacgum, eaten flag
-│
-├── src/maze.py             # Adapter: A-Maze-ing bitmask grid → (2H+1)×(2W+1) MazeGrid
-├── src/highscore.py        # load / save / add_entry — top-10 JSON persistence
-│
-└── tests/                  # 131 tests total, all passing
-    ├── test_config.py      # config loading, errors, clamping, comments
-    ├── test_entrypoint.py  # command-line argument and config-file errors
-    ├── test_highscore.py   # CRUD, validation, persistence
-    ├── test_maze*.py       # dimensions, walls, corridors, fallback
-    ├── test_entities.py    # Player movement, Ghost AI, Pellet
-    ├── test_game_input.py  # keyboard handling and menu start/exit
-    ├── test_menu.py        # main menu navigation and subviews
-    └── test_level.py       # update loop, collisions, timer, cheats
+└── management/                        # Project management and process documents
+    ├── team.md                        # Team organization
+    ├── technical_choices.md           # Technical rationale
+    ├── test_plan.md                   # Acceptance test strategy
+    ├── risks.md                       # Risk analysis and mitigations
+    └── timeline.md                    # Project timeline
 ```
 
 ---
