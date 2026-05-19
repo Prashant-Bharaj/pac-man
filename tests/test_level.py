@@ -73,7 +73,6 @@ def _reachable_from_player(lv: Level) -> set[tuple[int, int]]:
 class TestLevelConstruction:
     def test_player_placed_on_corridor(self) -> None:
         lv = _level()
-        from src.maze import is_corridor
         assert is_corridor(lv.grid, lv.player.x, lv.player.y)
 
     def test_ghosts_placed_at_corners(self) -> None:
@@ -138,7 +137,6 @@ class TestLevelConstruction:
             }])
             assert lv.grid_width == width
             assert lv.grid_height == height
-            from src.maze import is_corridor
             assert is_corridor(lv.grid, lv.player.x, lv.player.y)
             assert len(lv.ghosts) == 4
 

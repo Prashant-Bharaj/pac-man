@@ -18,7 +18,6 @@ def _default_config_path() -> str:
     return os.path.join(base, "config.json")
 
 
-
 async def main() -> None:
     """Parse arguments, load config, and launch the game."""
     if len(sys.argv) == 1:
