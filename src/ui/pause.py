@@ -14,6 +14,7 @@ _font_cache: dict[int, pygame.font.Font] = {}
 
 
 def _font(size: int) -> pygame.font.Font:
+    """Return a cached monospace font of the given size."""
     if size not in _font_cache:
         _font_cache[size] = pygame.font.SysFont("monospace", size)
     return _font_cache[size]

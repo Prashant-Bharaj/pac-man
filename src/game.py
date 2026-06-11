@@ -98,6 +98,7 @@ class Game:
     # ------------------------------------------------------------------
 
     def _handle_event(self, event: pygame.event.Event) -> None:
+        """Dispatch a single pygame event to the right handler."""
         if event.type == pygame.QUIT:
             self.state = GameState.QUIT
             return
@@ -105,6 +106,7 @@ class Game:
             self._handle_keydown(event.key)
 
     def _handle_keydown(self, key: int) -> None:
+        """Route a key press based on the current game state."""
         if self.state == GameState.MAIN_MENU:
             action = self._menu.handle_keydown(key)
             if action == "start":
@@ -125,6 +127,7 @@ class Game:
             self._handle_end_screen_key(key)
 
     def _handle_playing_key(self, key: int) -> None:
+        """Apply gameplay keys: movement, pause, and cheats."""
         if self.level is None:
             return
         if key in (pygame.K_UP, pygame.K_w):
@@ -176,6 +179,7 @@ class Game:
     # ------------------------------------------------------------------
 
     def _start_game(self) -> None:
+        """Reset state and load the first level for a new game."""
         self.level_index = 0
         self.cheat = CheatMode()
         self._load_level(starting_lives=None, starting_score=0)
@@ -184,6 +188,7 @@ class Game:
     def _load_level(
         self, starting_lives: int | None = None, starting_score: int = 0
     ) -> None:
+        """Build the current level and resize the window to fit it."""
         cfg = self._level_cfg(self.level_index)
         self.level = Level(
             index=self.level_index,
@@ -201,6 +206,7 @@ class Game:
         )
 
     def _resize_window(self) -> None:
+        """Resize the window and renderer to match the level grid."""
         if self.level is None:
             return
         w = self.level.grid_width * CELL_SIZE
@@ -209,11 +215,13 @@ class Game:
         self._renderer = Renderer(w, h, CELL_SIZE)
 
     def _level_cfg(self, index: int) -> LevelConfig:
+        """Return the config for a level index, or a default."""
         if index < len(self.config.levels):
             return self.config.levels[index]
         return LevelConfig()
 
     def _advance_level(self) -> None:
+        """Carry score/lives to the next level, or win the game."""
         if self.level is None:
             return
         score = self.level.player.score
@@ -228,6 +236,7 @@ class Game:
             self.state = GameState.PLAYING
 
     def _reset_to_menu(self) -> None:
+        """Clear level state and return to the main menu."""
         self.level = None
         self.level_index = 0
         self.cheat = CheatMode()
@@ -242,6 +251,7 @@ class Game:
     # ------------------------------------------------------------------
 
     def _update(self, dt: float, screen: pygame.Surface) -> None:
+        """Render the active game state for the current frame."""
         if self.state == GameState.MAIN_MENU:
             self._menu.render(screen, self._highscores)
 
@@ -272,6 +282,7 @@ class Game:
             self._victory.render(screen, self._pending_score, self._name_buf)
 
     def _update_playing(self, dt: float, screen: pygame.Surface) -> None:
+        """Advance the level, apply scored events, and draw it."""
         if self.level is None:
             return
 

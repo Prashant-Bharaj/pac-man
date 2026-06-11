@@ -97,6 +97,7 @@ class Renderer:
     def _draw_maze(
         self, screen: pygame.Surface, level: "Level"
     ) -> None:
+        """Draw the maze, cached to a surface until the grid changes."""
         grid_id = id(level.grid)
         if self._maze_surface is None or self._maze_grid_id != grid_id:
             cell_size = self.cell_size
@@ -218,6 +219,7 @@ class Renderer:
     def _draw_pellets(
         self, screen: pygame.Surface, level: "Level", tick: int
     ) -> None:
+        """Draw uneaten pacgums and blinking super-pacgums."""
         cell_size = self.cell_size
         for pellet in level.pellets:
             if pellet.eaten:
@@ -241,6 +243,7 @@ class Renderer:
     def _draw_player(
         self, screen: pygame.Surface, level: "Level", tick: int
     ) -> None:
+        """Draw Pac-Man with an animated chomping mouth."""
         cell_size = self.cell_size
         pl = level.player
         cx = pl.x * cell_size + cell_size // 2
@@ -302,6 +305,7 @@ class Renderer:
         tick: int,
         is_invincible: bool = False,
     ) -> None:
+        """Draw each active ghost, coloured by its current state."""
         for ghost in level.ghosts:
             if not ghost.is_active():
                 continue
@@ -335,6 +339,7 @@ class Renderer:
         color: tuple[int, int, int],
         show_eyes: bool,
     ) -> None:
+        """Draw one ghost: dome, body, wavy skirt, and eyes."""
         # Dome: circle shifted upward so the ghost fits the cell
         dome_cy = cy - r // 4
         pygame.draw.circle(screen, color, (cx, dome_cy), r)

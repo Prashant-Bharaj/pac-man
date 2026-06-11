@@ -36,6 +36,7 @@ _font_cache: dict[int, pygame.font.Font] = {}
 
 
 def _font(size: int) -> pygame.font.Font:
+    """Return a cached monospace font of the given size."""
     if size not in _font_cache:
         _font_cache[size] = pygame.font.SysFont("monospace", size)
     return _font_cache[size]
@@ -48,6 +49,7 @@ def _blit_centred(
     color: tuple[int, int, int],
     size: int,
 ) -> None:
+    """Render text and blit it horizontally centred at y."""
     surf = _font(size).render(text, True, color)
     screen.blit(surf, (screen.get_width() // 2 - surf.get_width() // 2, y))
 
@@ -142,6 +144,7 @@ class MainMenu:
         return None
 
     def _draw_home(self, screen: pygame.Surface, w: int, h: int) -> None:
+        """Draw the menu items with the selection highlighted."""
         start_y = h // 3
         item_w = min(360, w - 80)
         item_h = 46
@@ -168,6 +171,7 @@ class MainMenu:
         h: int,
         highscores: list[HighscoreEntry],
     ) -> None:
+        """Draw the top-10 highscores list."""
         _blit_centred(screen, "TOP 10 HIGHSCORES", h // 4, _YELLOW, 28)
         if not highscores:
             _blit_centred(screen, "No scores yet", h // 4 + 56, _GRAY, 22)
@@ -185,6 +189,7 @@ class MainMenu:
     def _draw_instructions(
         self, screen: pygame.Surface, w: int, h: int
     ) -> None:
+        """Draw the controls and rules screen."""
         _blit_centred(screen, "INSTRUCTIONS", h // 4, _YELLOW, 28)
         lines = [
             "Move: Arrow keys or WASD",

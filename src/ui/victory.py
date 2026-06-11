@@ -15,6 +15,7 @@ _font_cache: dict[int, pygame.font.Font] = {}
 
 
 def _font(size: int) -> pygame.font.Font:
+    """Return a cached monospace font of the given size."""
     if size not in _font_cache:
         _font_cache[size] = pygame.font.SysFont("monospace", size)
     return _font_cache[size]
@@ -27,6 +28,7 @@ def _blit_centred(
     color: tuple[int, int, int],
     size: int,
 ) -> None:
+    """Render text and blit it horizontally centred at y."""
     surf = _font(size).render(text, True, color)
     screen.blit(surf, (screen.get_width() // 2 - surf.get_width() // 2, y))
 
