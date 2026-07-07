@@ -10,10 +10,10 @@ pacgums to advance; complete every level to win.
 
 HOW TO RUN
 ----------
-    python3 pac-man.py config.json
+    make run
 
-The program takes exactly one argument: a JSON config file. On any config
-error the game prints a clear message and exits without a traceback.
+This launches the game with the default config.json. On any config error the
+game prints a clear message and exits without a traceback.
 
 
 CONTROLS

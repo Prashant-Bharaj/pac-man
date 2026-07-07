@@ -68,8 +68,8 @@ Creates a redistributable source archive in `pkg/` containing the game,
 default configuration, in-package instructions, tests, and the assigned
 `mazegenerator` wheel.
 
-Deployment is complete: the packaged build is ready for distribution through
-the project's public gaming platform page.
+Deployment is complete: the packaged build is available on itch.io at
+[marcokramer.itch.io/pac-man](https://marcokramer.itch.io/pac-man).
 
 ### Clean
 
