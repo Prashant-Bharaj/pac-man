@@ -51,9 +51,12 @@ invalid values fall back to safe defaults without crashing.
     points_per_pacgum         Score per pacgum (default 10)
     points_per_super_pacgum   Score per super-pacgum (default 50)
     points_per_ghost          Score per edible ghost (default 200)
-    seed                      RNG seed for level 1 maze (default 42)
     level_max_time            Time limit per level, seconds (default 90,
                               clamped 10-3600)
-    levels                    Array of per-level configs (width, height, seed)
+    levels                    Array of per-level configs (width, height, and
+                              seed for level 1)
+
+The seed in the first level config generates level 1 (default 42).
+Subsequent levels are generated with random seeds.
 
 See config.json for a working example.

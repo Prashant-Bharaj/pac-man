@@ -128,10 +128,13 @@ class LevelConfig(BaseModel):
     @classmethod
     def warn_missing_values(cls, data: Any, info: ValidationInfo) -> Any:
         """Warn when an external level omits configurable values."""
+        defaults = {"width": 20, "height": 20}
+        if (info.context or {}).get("config_path") == "levels[0]":
+            defaults["seed"] = 42
         return _warn_missing_fields(
             data,
             info,
-            {"width": 20, "height": 20, "seed": 42},
+            defaults,
         )
 
     @field_validator("width", "height", mode="before")
@@ -181,7 +184,6 @@ class GameConfig(BaseModel):
     points_per_pacgum: int = Field(default=10, ge=0, le=99999)
     points_per_super_pacgum: int = Field(default=50, ge=0, le=99999)
     points_per_ghost: int = Field(default=200, ge=0, le=99999)
-    seed: int = Field(default=42, ge=0, le=_MAX_SEED)
     level_max_time: int = Field(default=90, ge=10, le=3600)
     levels: list[LevelConfig] = Field(default_factory=_default_levels)
 
@@ -201,7 +203,6 @@ class GameConfig(BaseModel):
                 "points_per_pacgum": 10,
                 "points_per_super_pacgum": 50,
                 "points_per_ghost": 200,
-                "seed": 42,
                 "level_max_time": 90,
             },
         )
@@ -283,25 +284,6 @@ class GameConfig(BaseModel):
         """
         return _clamp_int(
             v, _config_path(info, info.field_name), 0, 99999, 0
-        )
-
-    @field_validator("seed", mode="before")
-    @classmethod
-    def clamp_seed(cls, v: Any, info: ValidationInfo) -> int:
-        """Clamp seed to [0, 2^31-1].
-
-        Args:
-            v: Raw field value.
-
-        Returns:
-            Integer clamped to valid range.
-        """
-        return _clamp_int(
-            v,
-            _config_path(info, info.field_name),
-            0,
-            _MAX_SEED,
-            42,
         )
 
     @field_validator("level_max_time", mode="before")

@@ -6,14 +6,14 @@
 
   # Starting lives
   "lives": 3,
+  "pacgum": 42,
 
   # Scoring
   "points_per_pacgum": 10,
   "points_per_super_pacgum": 50,
   "points_per_ghost": 200,
 
-  # Level defaults
-  "seed": 42,
+  # Level settings
   "level_max_time": 900,
 
   # Level definitions (at least 10 required)

@@ -29,7 +29,6 @@ def complete_config() -> dict[str, object]:
         "points_per_pacgum": 10,
         "points_per_super_pacgum": 50,
         "points_per_ghost": 200,
-        "seed": 42,
         "level_max_time": 90,
         "levels": levels,
     }
@@ -42,7 +41,6 @@ def test_valid_config(tmp_path: Path) -> None:
         "points_per_pacgum": 20,
         "points_per_super_pacgum": 100,
         "points_per_ghost": 400,
-        "seed": 7,
         "level_max_time": 60,
         "highscore_filename": "scores.json",
         "levels": [{"width": 15, "height": 15, "seed": 7}],
@@ -51,7 +49,6 @@ def test_valid_config(tmp_path: Path) -> None:
     cfg = load_config(path)
     assert cfg.lives == 5
     assert cfg.points_per_pacgum == 20
-    assert cfg.seed == 7
     assert cfg.highscore_filename == "scores.json"
     assert len(cfg.levels) == 10
     assert cfg.levels[0].width == 15
@@ -267,6 +264,25 @@ def test_missing_levels_logs_default_count(
     )
 
 
+def test_later_level_seed_is_optional(
+    tmp_path: Path, caplog: pytest.LogCaptureFixture
+) -> None:
+    """Later random levels do not require an unused seed value."""
+    data = complete_config()
+    levels = data["levels"]
+    assert isinstance(levels, list)
+    second_level = levels[1]
+    assert isinstance(second_level, dict)
+    del second_level["seed"]
+    path = write_config(tmp_path, json.dumps(data))
+
+    with caplog.at_level(logging.WARNING):
+        cfg = load_config(path)
+
+    assert cfg.levels[1].seed == 42
+    assert not caplog.records
+
+
 def test_invalid_values_log_fallbacks(
     tmp_path: Path, caplog: pytest.LogCaptureFixture
 ) -> None:
@@ -315,7 +331,6 @@ def test_out_of_range_values_log_clamps(
             "points_per_pacgum": -1,
             "points_per_super_pacgum": 100000,
             "points_per_ghost": -2,
-            "seed": 2**31,
             "level_max_time": 5,
         }
     )
@@ -323,7 +338,10 @@ def test_out_of_range_values_log_clamps(
     assert isinstance(levels, list)
     first_level = levels[0]
     assert isinstance(first_level, dict)
-    first_level.update({"width": 6, "height": 5, "seed": -1})
+    first_level.update({"width": 6, "height": 5, "seed": 2**31})
+    second_level = levels[1]
+    assert isinstance(second_level, dict)
+    second_level["seed"] = -1
     path = write_config(tmp_path, json.dumps(data))
 
     with caplog.at_level(logging.WARNING):
@@ -334,11 +352,11 @@ def test_out_of_range_values_log_clamps(
     assert cfg.points_per_pacgum == 0
     assert cfg.points_per_super_pacgum == 99999
     assert cfg.points_per_ghost == 0
-    assert cfg.seed == 2**31 - 1
     assert cfg.level_max_time == 10
     assert cfg.levels[0].width == 7
     assert cfg.levels[0].height == 7
-    assert cfg.levels[0].seed == 0
+    assert cfg.levels[0].seed == 2**31 - 1
+    assert cfg.levels[1].seed == 0
     assert (
         "Config 'lives' value -5 is below minimum 1, clamping to 1"
         in caplog.text
@@ -350,6 +368,10 @@ def test_out_of_range_values_log_clamps(
     assert (
         "Config 'levels[0].width' value 6 is below minimum 7, "
         "clamping to 7" in caplog.text
+    )
+    assert (
+        "Config 'levels[0].seed' value 2147483648 is above maximum "
+        "2147483647, clamping to 2147483647" in caplog.text
     )
 
 
