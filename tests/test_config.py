@@ -6,7 +6,7 @@ from pathlib import Path
 
 import pytest
 
-from src.config import ConfigLoadError, load_config
+from src.config import ConfigLoadError, GameConfig, LevelConfig, load_config
 
 
 def write_config(tmp_path: Path, content: str) -> str:
@@ -14,6 +14,25 @@ def write_config(tmp_path: Path, content: str) -> str:
     p = tmp_path / "config.json"
     p.write_text(content)
     return str(p)
+
+
+def complete_config() -> dict[str, object]:
+    """Return a complete valid config that requires no corrections."""
+    levels = [
+        {"width": 20, "height": 20, "seed": index}
+        for index in range(10)
+    ]
+    return {
+        "highscore_filename": "highscores.json",
+        "lives": 3,
+        "pacgum": 42,
+        "points_per_pacgum": 10,
+        "points_per_super_pacgum": 50,
+        "points_per_ghost": 200,
+        "seed": 42,
+        "level_max_time": 90,
+        "levels": levels,
+    }
 
 
 def test_valid_config(tmp_path: Path) -> None:
@@ -203,3 +222,161 @@ def test_missing_keys_use_defaults(tmp_path: Path) -> None:
     assert cfg.points_per_pacgum == 10
     assert cfg.points_per_ghost == 200
     assert len(cfg.levels) == 10
+
+
+def test_missing_keys_log_defaults(
+    tmp_path: Path, caplog: pytest.LogCaptureFixture
+) -> None:
+    """Missing top-level and level fields identify their defaults."""
+    data = complete_config()
+    del data["lives"]
+    levels = data["levels"]
+    assert isinstance(levels, list)
+    first_level = levels[0]
+    assert isinstance(first_level, dict)
+    del first_level["seed"]
+    path = write_config(tmp_path, json.dumps(data))
+
+    with caplog.at_level(logging.WARNING):
+        cfg = load_config(path)
+
+    assert cfg.lives == 3
+    assert cfg.levels[0].seed == 42
+    assert "Config 'lives' is missing, using default 3" in caplog.text
+    assert (
+        "Config 'levels[0].seed' is missing, using default 42"
+        in caplog.text
+    )
+
+
+def test_missing_levels_logs_default_count(
+    tmp_path: Path, caplog: pytest.LogCaptureFixture
+) -> None:
+    """A missing level list reports the number of generated defaults."""
+    data = complete_config()
+    del data["levels"]
+    path = write_config(tmp_path, json.dumps(data))
+
+    with caplog.at_level(logging.WARNING):
+        cfg = load_config(path)
+
+    assert len(cfg.levels) == 10
+    assert (
+        "Config 'levels' is missing, using 10 default levels"
+        in caplog.text
+    )
+
+
+def test_invalid_values_log_fallbacks(
+    tmp_path: Path, caplog: pytest.LogCaptureFixture
+) -> None:
+    """Invalid values identify their fields, values, and fallbacks."""
+    data = complete_config()
+    data["highscore_filename"] = None
+    data["lives"] = "bad"
+    data["points_per_ghost"] = []
+    levels = data["levels"]
+    assert isinstance(levels, list)
+    first_level = levels[0]
+    assert isinstance(first_level, dict)
+    first_level["width"] = "wide"
+    path = write_config(tmp_path, json.dumps(data))
+
+    with caplog.at_level(logging.WARNING):
+        cfg = load_config(path)
+
+    assert cfg.highscore_filename == "highscores.json"
+    assert cfg.lives == 3
+    assert cfg.points_per_ghost == 0
+    assert cfg.levels[0].width == 20
+    assert (
+        "Config 'lives' value 'bad' is invalid, using default 3"
+        in caplog.text
+    )
+    assert (
+        "Config 'points_per_ghost' value [] is invalid, using default 0"
+        in caplog.text
+    )
+    assert (
+        "Config 'levels[0].width' value 'wide' is invalid, using default 20"
+        in caplog.text
+    )
+
+
+def test_out_of_range_values_log_clamps(
+    tmp_path: Path, caplog: pytest.LogCaptureFixture
+) -> None:
+    """Out-of-range numeric values report their applied boundaries."""
+    data = complete_config()
+    data.update(
+        {
+            "lives": -5,
+            "pacgum": 10000,
+            "points_per_pacgum": -1,
+            "points_per_super_pacgum": 100000,
+            "points_per_ghost": -2,
+            "seed": 2**31,
+            "level_max_time": 5,
+        }
+    )
+    levels = data["levels"]
+    assert isinstance(levels, list)
+    first_level = levels[0]
+    assert isinstance(first_level, dict)
+    first_level.update({"width": 6, "height": 5, "seed": -1})
+    path = write_config(tmp_path, json.dumps(data))
+
+    with caplog.at_level(logging.WARNING):
+        cfg = load_config(path)
+
+    assert cfg.lives == 1
+    assert cfg.pacgum == 9999
+    assert cfg.points_per_pacgum == 0
+    assert cfg.points_per_super_pacgum == 99999
+    assert cfg.points_per_ghost == 0
+    assert cfg.seed == 2**31 - 1
+    assert cfg.level_max_time == 10
+    assert cfg.levels[0].width == 7
+    assert cfg.levels[0].height == 7
+    assert cfg.levels[0].seed == 0
+    assert (
+        "Config 'lives' value -5 is below minimum 1, clamping to 1"
+        in caplog.text
+    )
+    assert (
+        "Config 'pacgum' value 10000 is above maximum 9999, "
+        "clamping to 9999" in caplog.text
+    )
+    assert (
+        "Config 'levels[0].width' value 6 is below minimum 7, "
+        "clamping to 7" in caplog.text
+    )
+
+
+def test_valid_values_and_unknown_keys_do_not_warn(
+    tmp_path: Path, caplog: pytest.LogCaptureFixture
+) -> None:
+    """Valid coercions and ignored unknown keys produce no warnings."""
+    data = complete_config()
+    data["lives"] = "3"
+    data["unknown_key_xyz"] = "ignore_me"
+    path = write_config(tmp_path, json.dumps(data))
+
+    with caplog.at_level(logging.WARNING):
+        cfg = load_config(path)
+
+    assert cfg.lives == 3
+    assert not caplog.records
+
+
+def test_direct_model_defaults_do_not_warn(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    """Internal model construction keeps omitted defaults quiet."""
+    with caplog.at_level(logging.WARNING):
+        game_config = GameConfig()
+        level_config = LevelConfig()
+
+    assert len(game_config.levels) == 10
+    assert level_config.width == 20
+    assert not caplog.records

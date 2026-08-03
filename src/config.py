@@ -10,11 +10,88 @@ import json
 import logging
 from typing import Any
 
-from pydantic import BaseModel, Field, ValidationError, field_validator
+from pydantic import (
+    BaseModel,
+    Field,
+    ValidationError,
+    ValidationInfo,
+    field_validator,
+    model_validator,
+)
 
 logger = logging.getLogger(__name__)
 
 _MIN_LEVELS: int = 10
+_MAX_SEED: int = 2**31 - 1
+
+
+def _config_path(info: ValidationInfo, field_name: str | None) -> str:
+    """Return a dotted config path for a validation warning."""
+    context = info.context or {}
+    prefix = context.get("config_path", "")
+    name = field_name or "value"
+    return f"{prefix}.{name}" if prefix else name
+
+
+def _clamp_int(
+    value: Any,
+    field_name: str,
+    minimum: int,
+    maximum: int | None,
+    default: int,
+) -> int:
+    """Convert and clamp an integer while logging any correction."""
+    try:
+        converted = int(value)
+    except (TypeError, ValueError, OverflowError):
+        logger.warning(
+            "Config '%s' value %r is invalid, using default %d",
+            field_name,
+            value,
+            default,
+        )
+        return default
+
+    if converted < minimum:
+        logger.warning(
+            "Config '%s' value %r is below minimum %d, clamping to %d",
+            field_name,
+            value,
+            minimum,
+            minimum,
+        )
+        return minimum
+    if maximum is not None and converted > maximum:
+        logger.warning(
+            "Config '%s' value %r is above maximum %d, clamping to %d",
+            field_name,
+            value,
+            maximum,
+            maximum,
+        )
+        return maximum
+    return converted
+
+
+def _warn_missing_fields(
+    data: Any,
+    info: ValidationInfo,
+    defaults: dict[str, Any],
+) -> Any:
+    """Log defaults used for fields absent from an external config."""
+    if not isinstance(data, dict) or not (info.context or {}).get(
+        "log_missing"
+    ):
+        return data
+
+    for field_name, default in defaults.items():
+        if field_name not in data:
+            logger.warning(
+                "Config '%s' is missing, using default %s",
+                _config_path(info, field_name),
+                default,
+            )
+    return data
 
 
 class ConfigLoadError(Exception):
@@ -43,13 +120,23 @@ class LevelConfig(BaseModel):
 
     width: int = Field(default=20, ge=7)
     height: int = Field(default=20, ge=7)
-    seed: int = Field(default=42, ge=0, le=2**31 - 1)
+    seed: int = Field(default=42, ge=0, le=_MAX_SEED)
 
     model_config = {"extra": "ignore"}
 
+    @model_validator(mode="before")
+    @classmethod
+    def warn_missing_values(cls, data: Any, info: ValidationInfo) -> Any:
+        """Warn when an external level omits configurable values."""
+        return _warn_missing_fields(
+            data,
+            info,
+            {"width": 20, "height": 20, "seed": 42},
+        )
+
     @field_validator("width", "height", mode="before")
     @classmethod
-    def clamp_dimension(cls, v: Any) -> int:
+    def clamp_dimension(cls, v: Any, info: ValidationInfo) -> int:
         """Clamp width/height to minimum 7.
 
         Args:
@@ -58,14 +145,11 @@ class LevelConfig(BaseModel):
         Returns:
             Integer clamped to valid range.
         """
-        try:
-            return max(7, int(v))
-        except (TypeError, ValueError):
-            return 20
+        return _clamp_int(v, _config_path(info, info.field_name), 7, None, 20)
 
     @field_validator("seed", mode="before")
     @classmethod
-    def clamp_seed(cls, v: Any) -> int:
+    def clamp_seed(cls, v: Any, info: ValidationInfo) -> int:
         """Clamp seed to [0, 2^31-1].
 
         Args:
@@ -74,10 +158,13 @@ class LevelConfig(BaseModel):
         Returns:
             Integer clamped to valid range.
         """
-        try:
-            return max(0, min(2**31 - 1, int(v)))
-        except (TypeError, ValueError):
-            return 42
+        return _clamp_int(
+            v,
+            _config_path(info, info.field_name),
+            0,
+            _MAX_SEED,
+            42,
+        )
 
 
 def _default_levels() -> list[LevelConfig]:
@@ -94,15 +181,44 @@ class GameConfig(BaseModel):
     points_per_pacgum: int = Field(default=10, ge=0, le=99999)
     points_per_super_pacgum: int = Field(default=50, ge=0, le=99999)
     points_per_ghost: int = Field(default=200, ge=0, le=99999)
-    seed: int = Field(default=42, ge=0, le=2**31 - 1)
+    seed: int = Field(default=42, ge=0, le=_MAX_SEED)
     level_max_time: int = Field(default=90, ge=10, le=3600)
     levels: list[LevelConfig] = Field(default_factory=_default_levels)
 
     model_config = {"extra": "ignore"}
 
+    @model_validator(mode="before")
+    @classmethod
+    def warn_missing_values(cls, data: Any, info: ValidationInfo) -> Any:
+        """Warn when an external config omits configurable values."""
+        data = _warn_missing_fields(
+            data,
+            info,
+            {
+                "highscore_filename": "highscores.json",
+                "lives": 3,
+                "pacgum": 42,
+                "points_per_pacgum": 10,
+                "points_per_super_pacgum": 50,
+                "points_per_ghost": 200,
+                "seed": 42,
+                "level_max_time": 90,
+            },
+        )
+        if (
+            isinstance(data, dict)
+            and (info.context or {}).get("log_missing")
+            and "levels" not in data
+        ):
+            logger.warning(
+                "Config 'levels' is missing, using %d default levels",
+                _MIN_LEVELS,
+            )
+        return data
+
     @field_validator("highscore_filename", mode="before")
     @classmethod
-    def validate_filename(cls, v: Any) -> str:
+    def validate_filename(cls, v: Any, info: ValidationInfo) -> str:
         """Fall back to default if filename is blank or not a string.
 
         Args:
@@ -113,14 +229,17 @@ class GameConfig(BaseModel):
         """
         if not isinstance(v, str) or not v.strip():
             logger.warning(
-                "Config 'highscore_filename' is invalid, using default"
+                "Config '%s' value %r is invalid, using default %r",
+                _config_path(info, info.field_name),
+                v,
+                "highscores.json",
             )
             return "highscores.json"
         return v.strip()
 
     @field_validator("lives", mode="before")
     @classmethod
-    def clamp_lives(cls, v: Any) -> int:
+    def clamp_lives(cls, v: Any, info: ValidationInfo) -> int:
         """Clamp lives to [1, 99].
 
         Args:
@@ -129,14 +248,11 @@ class GameConfig(BaseModel):
         Returns:
             Integer clamped to valid range.
         """
-        try:
-            return max(1, min(99, int(v)))
-        except (TypeError, ValueError):
-            return 3
+        return _clamp_int(v, _config_path(info, info.field_name), 1, 99, 3)
 
     @field_validator("pacgum", mode="before")
     @classmethod
-    def clamp_pacgum(cls, v: Any) -> int:
+    def clamp_pacgum(cls, v: Any, info: ValidationInfo) -> int:
         """Clamp pacgum count to [1, 9999].
 
         Args:
@@ -145,10 +261,9 @@ class GameConfig(BaseModel):
         Returns:
             Integer clamped to valid range.
         """
-        try:
-            return max(1, min(9999, int(v)))
-        except (TypeError, ValueError):
-            return 42
+        return _clamp_int(
+            v, _config_path(info, info.field_name), 1, 9999, 42
+        )
 
     @field_validator(
         "points_per_pacgum",
@@ -157,7 +272,7 @@ class GameConfig(BaseModel):
         mode="before",
     )
     @classmethod
-    def clamp_points(cls, v: Any) -> int:
+    def clamp_points(cls, v: Any, info: ValidationInfo) -> int:
         """Clamp point values to [0, 99999].
 
         Args:
@@ -166,14 +281,13 @@ class GameConfig(BaseModel):
         Returns:
             Integer clamped to valid range.
         """
-        try:
-            return max(0, min(99999, int(v)))
-        except (TypeError, ValueError):
-            return 0
+        return _clamp_int(
+            v, _config_path(info, info.field_name), 0, 99999, 0
+        )
 
     @field_validator("seed", mode="before")
     @classmethod
-    def clamp_seed(cls, v: Any) -> int:
+    def clamp_seed(cls, v: Any, info: ValidationInfo) -> int:
         """Clamp seed to [0, 2^31-1].
 
         Args:
@@ -182,14 +296,17 @@ class GameConfig(BaseModel):
         Returns:
             Integer clamped to valid range.
         """
-        try:
-            return max(0, min(2**31 - 1, int(v)))
-        except (TypeError, ValueError):
-            return 42
+        return _clamp_int(
+            v,
+            _config_path(info, info.field_name),
+            0,
+            _MAX_SEED,
+            42,
+        )
 
     @field_validator("level_max_time", mode="before")
     @classmethod
-    def clamp_level_max_time(cls, v: Any) -> int:
+    def clamp_level_max_time(cls, v: Any, info: ValidationInfo) -> int:
         """Clamp level_max_time to [10, 3600].
 
         Args:
@@ -198,14 +315,13 @@ class GameConfig(BaseModel):
         Returns:
             Integer clamped to valid range.
         """
-        try:
-            return max(10, min(3600, int(v)))
-        except (TypeError, ValueError):
-            return 90
+        return _clamp_int(
+            v, _config_path(info, info.field_name), 10, 3600, 90
+        )
 
     @field_validator("levels", mode="before")
     @classmethod
-    def validate_levels(cls, v: Any) -> list[Any]:
+    def validate_levels(cls, v: Any, info: ValidationInfo) -> list[Any]:
         """Validate level entries and replace invalid items with defaults.
 
         Args:
@@ -216,21 +332,31 @@ class GameConfig(BaseModel):
         """
         if not isinstance(v, list) or not v:
             logger.warning(
-                "Config 'levels' is missing or empty, using %d default levels",
+                "Config 'levels' value %r is invalid or empty, using %d "
+                "default levels",
+                v,
                 _MIN_LEVELS,
             )
-            return [{} for _ in range(_MIN_LEVELS)]
+            return [LevelConfig() for _ in range(_MIN_LEVELS)]
 
         levels: list[Any] = []
         for index, item in enumerate(v):
-            if isinstance(item, (dict, LevelConfig)):
+            if isinstance(item, LevelConfig):
                 levels.append(item)
+            elif isinstance(item, dict):
+                context = dict(info.context or {})
+                context["config_path"] = f"levels[{index}]"
+                levels.append(
+                    LevelConfig.model_validate(item, context=context)
+                )
             else:
                 logger.warning(
-                    "Config 'levels[%d]' is invalid, using default level",
+                    "Config 'levels[%d]' value %r is invalid, using "
+                    "default level",
                     index,
+                    item,
                 )
-                levels.append({})
+                levels.append(LevelConfig())
 
         if len(levels) < _MIN_LEVELS:
             defaults_needed = _MIN_LEVELS - len(levels)
@@ -241,7 +367,7 @@ class GameConfig(BaseModel):
                 defaults_needed,
                 _MIN_LEVELS,
             )
-            levels.extend({} for _ in range(defaults_needed))
+            levels.extend(LevelConfig() for _ in range(defaults_needed))
         return levels
 
 
@@ -282,7 +408,10 @@ def load_config(path: str) -> GameConfig:
         )
 
     try:
-        return GameConfig.model_validate(data)
+        return GameConfig.model_validate(
+            data,
+            context={"log_missing": True},
+        )
     except ValidationError as exc:
         logger.error(
             "Config '%s' has invalid values: %s — using all defaults",
