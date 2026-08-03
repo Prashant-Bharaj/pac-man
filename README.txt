@@ -12,8 +12,9 @@ HOW TO RUN
 ----------
     make run
 
-This launches the game with the default config.json. On any config error the
-game prints a clear message and exits without a traceback.
+This launches the game with the default config.json. Config paths must use a
+.json extension (case-insensitive). On any config error the game prints a clear
+message and exits without a traceback.
 
 
 CONTROLS
