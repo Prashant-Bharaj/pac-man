@@ -1,4 +1,4 @@
-*This project has been created as part of the 42 curriculum by prasingh and msantos2.*
+*This project has been created as part of the 42 curriculum by prasingh, msantos2.*
 
 # Pac-Man — Ghosts! More ghosts!
 
@@ -49,7 +49,6 @@ Launches the game under Python's built-in `pdb` debugger.
 
 ```bash
 make lint          # flake8 + mypy
-make lint-strict   # flake8 + mypy --strict
 ```
 
 ### Test
@@ -145,8 +144,7 @@ fall back to safe defaults without crashing.
 | `levels` | 10 default levels | Array of per-level configs (`width`, `height`, and `seed` for level 1) |
 
 Level `width` and `height` are the exact visible maze size in grid cells.
-Each dimension must be at least `7`; there is no configured maximum, so
-larger mazes are attempted as requested.
+Each dimension is clamped to the supported range of `7` through `100`.
 The `seed` in the first level entry generates a reproducible first maze;
 seeds in later entries are ignored because subsequent mazes are random.
 

@@ -22,6 +22,7 @@ from pydantic import (
 logger = logging.getLogger(__name__)
 
 _MIN_LEVELS: int = 10
+_MAX_MAZE_DIMENSION: int = 100
 _MAX_SEED: int = 2**31 - 1
 
 
@@ -118,8 +119,8 @@ def _strip_comments(text: str) -> str:
 class LevelConfig(BaseModel):
     """Configuration for a single level."""
 
-    width: int = Field(default=20, ge=7)
-    height: int = Field(default=20, ge=7)
+    width: int = Field(default=20, ge=7, le=_MAX_MAZE_DIMENSION)
+    height: int = Field(default=20, ge=7, le=_MAX_MAZE_DIMENSION)
     seed: int = Field(default=42, ge=0, le=_MAX_SEED)
 
     model_config = {"extra": "ignore"}
@@ -140,7 +141,7 @@ class LevelConfig(BaseModel):
     @field_validator("width", "height", mode="before")
     @classmethod
     def clamp_dimension(cls, v: Any, info: ValidationInfo) -> int:
-        """Clamp width/height to minimum 7.
+        """Clamp width/height to the supported range of 7 to 100.
 
         Args:
             v: Raw field value.
@@ -148,7 +149,13 @@ class LevelConfig(BaseModel):
         Returns:
             Integer clamped to valid range.
         """
-        return _clamp_int(v, _config_path(info, info.field_name), 7, None, 20)
+        return _clamp_int(
+            v,
+            _config_path(info, info.field_name),
+            7,
+            _MAX_MAZE_DIMENSION,
+            20,
+        )
 
     @field_validator("seed", mode="before")
     @classmethod

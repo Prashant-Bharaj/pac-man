@@ -114,15 +114,44 @@ def test_level_dimensions_allow_seven(tmp_path: Path) -> None:
     assert cfg.levels[0].height == 7
 
 
-def test_level_dimensions_have_no_maximum_clamp(tmp_path: Path) -> None:
-    """Level dimensions above 100 are preserved."""
+def test_level_dimensions_allow_one_hundred(tmp_path: Path) -> None:
+    """100x100 is the maximum accepted level size."""
+    data = complete_config()
+    levels = data["levels"]
+    assert isinstance(levels, list)
+    first_level = levels[0]
+    assert isinstance(first_level, dict)
+    first_level.update({"width": 100, "height": 100})
+    path = write_config(tmp_path, json.dumps(data))
+
+    cfg = load_config(path)
+
+    assert cfg.levels[0].width == 100
+    assert cfg.levels[0].height == 100
+
+
+def test_level_dimensions_clamped_to_maximum(
+    tmp_path: Path, caplog: pytest.LogCaptureFixture
+) -> None:
+    """Level dimensions above 100 are clamped with clear warnings."""
     path = write_config(
         tmp_path,
         '{"levels": [{"width": 101, "height": 250}]}',
     )
-    cfg = load_config(path)
-    assert cfg.levels[0].width == 101
-    assert cfg.levels[0].height == 250
+
+    with caplog.at_level(logging.WARNING):
+        cfg = load_config(path)
+
+    assert cfg.levels[0].width == 100
+    assert cfg.levels[0].height == 100
+    assert (
+        "Config 'levels[0].width' value 101 is above maximum 100, "
+        "clamping to 100" in caplog.text
+    )
+    assert (
+        "Config 'levels[0].height' value 250 is above maximum 100, "
+        "clamping to 100" in caplog.text
+    )
 
 
 def test_invalid_level_dimension_uses_default(tmp_path: Path) -> None:

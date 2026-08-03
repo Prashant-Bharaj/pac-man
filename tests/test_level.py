@@ -128,7 +128,7 @@ class TestLevelConstruction:
             (13, 10),
             (20, 20),
             (21, 21),
-            (101, 102),
+            (99, 100),
         ]:
             lv = _level(levels=[{
                 "width": width,

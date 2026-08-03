@@ -59,6 +59,7 @@ invalid values fall back to safe defaults without crashing.
     levels                    Array of per-level configs (width, height, and
                               seed for level 1)
 
+Level width and height are clamped to the supported range of 7 through 100.
 The seed in the first level config generates level 1 (default 42).
 Subsequent levels are generated with random seeds.
 
