@@ -138,9 +138,9 @@ fall back to safe defaults without crashing.
 | `highscore_filename` | `"highscores.json"` | Path to the highscore storage file |
 | `lives` | `3` | Starting lives (clamped to 1–99) |
 | `pacgum` | `42` | Parsed compatibility value; pacgums are placed automatically in most reachable corridors |
-| `points_per_pacgum` | `10` | Score for eating a pacgum |
-| `points_per_super_pacgum` | `50` | Score for eating a super-pacgum |
-| `points_per_ghost` | `200` | Score for eating an edible ghost |
+| `points_per_pacgum` | `10` | Score for eating a pacgum (clamped to 1–99999) |
+| `points_per_super_pacgum` | `50` | Score for eating a super-pacgum (clamped to 1–99999) |
+| `points_per_ghost` | `200` | Score for eating an edible ghost (clamped to 1–99999) |
 | `level_max_time` | `90` | Time limit per level in seconds (clamped to 10–3600) |
 | `levels` | 10 default levels | Array of per-level configs (`width`, `height`, and `seed` for level 1) |
 

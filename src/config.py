@@ -181,9 +181,9 @@ class GameConfig(BaseModel):
     highscore_filename: str = "highscores.json"
     lives: int = Field(default=3, ge=1, le=99)
     pacgum: int = Field(default=42, ge=1, le=9999)
-    points_per_pacgum: int = Field(default=10, ge=0, le=99999)
-    points_per_super_pacgum: int = Field(default=50, ge=0, le=99999)
-    points_per_ghost: int = Field(default=200, ge=0, le=99999)
+    points_per_pacgum: int = Field(default=10, ge=1, le=99999)
+    points_per_super_pacgum: int = Field(default=50, ge=1, le=99999)
+    points_per_ghost: int = Field(default=200, ge=1, le=99999)
     level_max_time: int = Field(default=90, ge=10, le=3600)
     levels: list[LevelConfig] = Field(default_factory=_default_levels)
 
@@ -274,7 +274,7 @@ class GameConfig(BaseModel):
     )
     @classmethod
     def clamp_points(cls, v: Any, info: ValidationInfo) -> int:
-        """Clamp point values to [0, 99999].
+        """Clamp point values to [1, 99999].
 
         Args:
             v: Raw field value.
@@ -282,8 +282,18 @@ class GameConfig(BaseModel):
         Returns:
             Integer clamped to valid range.
         """
+        defaults = {
+            "points_per_pacgum": 10,
+            "points_per_super_pacgum": 50,
+            "points_per_ghost": 200,
+        }
+        field_name = info.field_name or "points_per_pacgum"
         return _clamp_int(
-            v, _config_path(info, info.field_name), 0, 99999, 0
+            v,
+            _config_path(info, field_name),
+            1,
+            99999,
+            defaults[field_name],
         )
 
     @field_validator("level_max_time", mode="before")

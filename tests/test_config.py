@@ -290,6 +290,8 @@ def test_invalid_values_log_fallbacks(
     data = complete_config()
     data["highscore_filename"] = None
     data["lives"] = "bad"
+    data["points_per_pacgum"] = "ten"
+    data["points_per_super_pacgum"] = None
     data["points_per_ghost"] = []
     levels = data["levels"]
     assert isinstance(levels, list)
@@ -303,14 +305,24 @@ def test_invalid_values_log_fallbacks(
 
     assert cfg.highscore_filename == "highscores.json"
     assert cfg.lives == 3
-    assert cfg.points_per_ghost == 0
+    assert cfg.points_per_pacgum == 10
+    assert cfg.points_per_super_pacgum == 50
+    assert cfg.points_per_ghost == 200
     assert cfg.levels[0].width == 20
     assert (
         "Config 'lives' value 'bad' is invalid, using default 3"
         in caplog.text
     )
     assert (
-        "Config 'points_per_ghost' value [] is invalid, using default 0"
+        "Config 'points_per_pacgum' value 'ten' is invalid, using default 10"
+        in caplog.text
+    )
+    assert (
+        "Config 'points_per_super_pacgum' value None is invalid, using "
+        "default 50" in caplog.text
+    )
+    assert (
+        "Config 'points_per_ghost' value [] is invalid, using default 200"
         in caplog.text
     )
     assert (
@@ -328,7 +340,7 @@ def test_out_of_range_values_log_clamps(
         {
             "lives": -5,
             "pacgum": 10000,
-            "points_per_pacgum": -1,
+            "points_per_pacgum": 0,
             "points_per_super_pacgum": 100000,
             "points_per_ghost": -2,
             "level_max_time": 5,
@@ -349,9 +361,9 @@ def test_out_of_range_values_log_clamps(
 
     assert cfg.lives == 1
     assert cfg.pacgum == 9999
-    assert cfg.points_per_pacgum == 0
+    assert cfg.points_per_pacgum == 1
     assert cfg.points_per_super_pacgum == 99999
-    assert cfg.points_per_ghost == 0
+    assert cfg.points_per_ghost == 1
     assert cfg.level_max_time == 10
     assert cfg.levels[0].width == 7
     assert cfg.levels[0].height == 7
@@ -364,6 +376,14 @@ def test_out_of_range_values_log_clamps(
     assert (
         "Config 'pacgum' value 10000 is above maximum 9999, "
         "clamping to 9999" in caplog.text
+    )
+    assert (
+        "Config 'points_per_pacgum' value 0 is below minimum 1, "
+        "clamping to 1" in caplog.text
+    )
+    assert (
+        "Config 'points_per_ghost' value -2 is below minimum 1, "
+        "clamping to 1" in caplog.text
     )
     assert (
         "Config 'levels[0].width' value 6 is below minimum 7, "
@@ -388,6 +408,25 @@ def test_valid_values_and_unknown_keys_do_not_warn(
         cfg = load_config(path)
 
     assert cfg.lives == 3
+    assert not caplog.records
+
+
+def test_scoring_boundaries_and_coercion_do_not_warn(
+    tmp_path: Path, caplog: pytest.LogCaptureFixture
+) -> None:
+    """Valid scoring boundaries and integer coercion need no correction."""
+    data = complete_config()
+    data["points_per_pacgum"] = 1
+    data["points_per_super_pacgum"] = 99999
+    data["points_per_ghost"] = "200"
+    path = write_config(tmp_path, json.dumps(data))
+
+    with caplog.at_level(logging.WARNING):
+        cfg = load_config(path)
+
+    assert cfg.points_per_pacgum == 1
+    assert cfg.points_per_super_pacgum == 99999
+    assert cfg.points_per_ghost == 200
     assert not caplog.records
 
 
