@@ -1,6 +1,7 @@
 """Tests for the config loader."""
 
 import json
+import logging
 from pathlib import Path
 
 import pytest
@@ -33,8 +34,9 @@ def test_valid_config(tmp_path: Path) -> None:
     assert cfg.points_per_pacgum == 20
     assert cfg.seed == 7
     assert cfg.highscore_filename == "scores.json"
-    assert len(cfg.levels) == 1
+    assert len(cfg.levels) == 10
     assert cfg.levels[0].width == 15
+    assert all(level.width == 20 for level in cfg.levels[1:])
 
 
 def test_missing_file() -> None:
@@ -129,33 +131,68 @@ def test_invalid_level_entry_uses_default(tmp_path: Path) -> None:
     """A malformed level entry is replaced with a default level."""
     path = write_config(tmp_path, '{"levels": ["bad"]}')
     cfg = load_config(path)
-    assert len(cfg.levels) == 1
+    assert len(cfg.levels) == 10
     assert cfg.levels[0].width == 20
     assert cfg.levels[0].height == 20
     assert cfg.levels[0].seed == 42
 
 
-def test_invalid_level_entries_preserve_length(tmp_path: Path) -> None:
-    """Multiple malformed level entries become default levels."""
+def test_invalid_level_entries_are_padded(tmp_path: Path) -> None:
+    """Malformed entries keep their positions before appended defaults."""
     path = write_config(tmp_path, '{"levels": [null, 1, []]}')
     cfg = load_config(path)
-    assert len(cfg.levels) == 3
+    assert len(cfg.levels) == 10
     assert all(level.width == 20 for level in cfg.levels)
     assert all(level.height == 20 for level in cfg.levels)
 
 
 def test_mixed_level_entries_keep_valid_values(tmp_path: Path) -> None:
-    """Valid level entries are preserved while malformed ones default."""
+    """Valid and malformed entries are preserved before padding."""
     path = write_config(
         tmp_path,
         '{"levels": [{"width": 15, "height": 16}, "bad"]}',
     )
     cfg = load_config(path)
-    assert len(cfg.levels) == 2
+    assert len(cfg.levels) == 10
     assert cfg.levels[0].width == 15
     assert cfg.levels[0].height == 16
     assert cfg.levels[1].width == 20
     assert cfg.levels[1].height == 20
+
+
+def test_exactly_ten_levels_are_not_extended(tmp_path: Path) -> None:
+    """A ten-level configuration remains exactly ten levels long."""
+    levels = [{"width": 10 + index, "height": 10 + index}
+              for index in range(10)]
+    path = write_config(tmp_path, json.dumps({"levels": levels}))
+
+    cfg = load_config(path)
+
+    assert len(cfg.levels) == 10
+    assert [level.width for level in cfg.levels] == list(range(10, 20))
+
+
+def test_more_than_ten_levels_are_preserved(tmp_path: Path) -> None:
+    """Configurations with more than ten levels are not truncated."""
+    levels = [{"width": 20, "height": 20} for _ in range(12)]
+    path = write_config(tmp_path, json.dumps({"levels": levels}))
+
+    cfg = load_config(path)
+
+    assert len(cfg.levels) == 12
+
+
+def test_short_level_list_logs_padding_warning(
+    tmp_path: Path, caplog: pytest.LogCaptureFixture
+) -> None:
+    """Padding a short level list emits one clear warning."""
+    path = write_config(tmp_path, '{"levels": [{"width": 15}]}')
+
+    with caplog.at_level(logging.WARNING):
+        cfg = load_config(path)
+
+    assert len(cfg.levels) == 10
+    assert "has 1 entries, adding 9 default levels" in caplog.text
 
 
 def test_missing_keys_use_defaults(tmp_path: Path) -> None:
@@ -165,3 +202,4 @@ def test_missing_keys_use_defaults(tmp_path: Path) -> None:
     assert cfg.lives == 3
     assert cfg.points_per_pacgum == 10
     assert cfg.points_per_ghost == 200
+    assert len(cfg.levels) == 10

@@ -14,6 +14,8 @@ from pydantic import BaseModel, Field, ValidationError, field_validator
 
 logger = logging.getLogger(__name__)
 
+_MIN_LEVELS: int = 10
+
 
 class ConfigLoadError(Exception):
     """Raised when the config file itself cannot be loaded."""
@@ -78,6 +80,11 @@ class LevelConfig(BaseModel):
             return 42
 
 
+def _default_levels() -> list[LevelConfig]:
+    """Return the minimum set of independent default level configs."""
+    return [LevelConfig() for _ in range(_MIN_LEVELS)]
+
+
 class GameConfig(BaseModel):
     """Full validated game configuration."""
 
@@ -89,7 +96,7 @@ class GameConfig(BaseModel):
     points_per_ghost: int = Field(default=200, ge=0, le=99999)
     seed: int = Field(default=42, ge=0, le=2**31 - 1)
     level_max_time: int = Field(default=90, ge=10, le=3600)
-    levels: list[LevelConfig] = Field(default_factory=list)
+    levels: list[LevelConfig] = Field(default_factory=_default_levels)
 
     model_config = {"extra": "ignore"}
 
@@ -209,9 +216,10 @@ class GameConfig(BaseModel):
         """
         if not isinstance(v, list) or not v:
             logger.warning(
-                "Config 'levels' is missing or empty, using 10 default levels"
+                "Config 'levels' is missing or empty, using %d default levels",
+                _MIN_LEVELS,
             )
-            return [{}] * 10
+            return [{} for _ in range(_MIN_LEVELS)]
 
         levels: list[Any] = []
         for index, item in enumerate(v):
@@ -223,6 +231,17 @@ class GameConfig(BaseModel):
                     index,
                 )
                 levels.append({})
+
+        if len(levels) < _MIN_LEVELS:
+            defaults_needed = _MIN_LEVELS - len(levels)
+            logger.warning(
+                "Config 'levels' has %d entries, adding %d default levels "
+                "to reach the minimum of %d",
+                len(levels),
+                defaults_needed,
+                _MIN_LEVELS,
+            )
+            levels.extend({} for _ in range(defaults_needed))
         return levels
 
 
