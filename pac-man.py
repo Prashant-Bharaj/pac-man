@@ -7,6 +7,7 @@ Usage:
 import asyncio
 import json
 import sys
+from pathlib import Path
 
 
 def _strip_comment_lines(text: str) -> str:
@@ -21,6 +22,10 @@ def _strip_comment_lines(text: str) -> str:
 
 def _preflight_config_file(path: str) -> None:
     """Fail early for unreadable or syntactically invalid config files."""
+    if Path(path).suffix.lower() != ".json":
+        print(f"Error: Config file '{path}' must have a .json extension")
+        sys.exit(1)
+
     try:
         with open(path, "r", encoding="utf-8") as fh:
             raw_text = fh.read()

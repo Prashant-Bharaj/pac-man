@@ -69,8 +69,8 @@ class Level:
     def __post_init__(self) -> None:
         """Build maze and place all entities."""
         self.time_remaining = float(self.config.level_max_time)
-        # Use config seed for level 0; subsequent levels use random seeds
-        # to ensure a unique experience on every playthrough.
+        # Use the first level entry's seed for level 0; subsequent levels
+        # are random to ensure a unique experience on every playthrough.
         if self.index == 0:
             seed = self.level_cfg.seed
         else:

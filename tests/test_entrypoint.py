@@ -58,3 +58,46 @@ def test_invalid_json_config_exits_with_error(tmp_path: Path) -> None:
     assert result.returncode == 1
     assert f"Error: Config '{bad_config}' is not valid JSON:" in result.stdout
     assert "Traceback" not in result.stderr
+
+
+def test_non_json_extension_exits_with_error(tmp_path: Path) -> None:
+    """Entrypoint rejects config files with a different extension."""
+    config = tmp_path / "config.txt"
+    config.write_text("{}", encoding="utf-8")
+
+    result = run_entrypoint(str(config))
+
+    assert result.returncode == 1
+    assert (
+        f"Error: Config file '{config}' must have a .json extension"
+        in result.stdout
+    )
+    assert "Traceback" not in result.stderr
+
+
+def test_missing_extension_exits_before_file_access(tmp_path: Path) -> None:
+    """Entrypoint checks the suffix before attempting to open a path."""
+    config = tmp_path / "config"
+
+    result = run_entrypoint(str(config))
+
+    assert result.returncode == 1
+    assert (
+        f"Error: Config file '{config}' must have a .json extension"
+        in result.stdout
+    )
+    assert "Cannot open config" not in result.stdout
+    assert "Traceback" not in result.stderr
+
+
+def test_json_extension_is_case_insensitive(tmp_path: Path) -> None:
+    """Uppercase JSON suffixes proceed to normal content validation."""
+    config = tmp_path / "bad.JSON"
+    config.write_text("{ invalid json }", encoding="utf-8")
+
+    result = run_entrypoint(str(config))
+
+    assert result.returncode == 1
+    assert f"Error: Config '{config}' is not valid JSON:" in result.stdout
+    assert "must have a .json extension" not in result.stdout
+    assert "Traceback" not in result.stderr

@@ -12,8 +12,9 @@ HOW TO RUN
 ----------
     make run
 
-This launches the game with the default config.json. On any config error the
-game prints a clear message and exits without a traceback.
+This launches the game with the default config.json. Config paths must use a
+.json extension (case-insensitive). On any config error the game prints a clear
+message and exits without a traceback.
 
 
 CONTROLS
@@ -48,12 +49,18 @@ invalid values fall back to safe defaults without crashing.
 
     highscore_filename        Path to the highscore file ("highscores.json")
     lives                     Starting lives (default 3, clamped 1-99)
-    points_per_pacgum         Score per pacgum (default 10)
-    points_per_super_pacgum   Score per super-pacgum (default 50)
-    points_per_ghost          Score per edible ghost (default 200)
-    seed                      RNG seed for level 1 maze (default 42)
+    points_per_pacgum         Score per pacgum (default 10, clamped 1-99999)
+    points_per_super_pacgum   Score per super-pacgum (default 50, clamped
+                              1-99999)
+    points_per_ghost          Score per edible ghost (default 200, clamped
+                              1-99999)
     level_max_time            Time limit per level, seconds (default 90,
                               clamped 10-3600)
-    levels                    Array of per-level configs (width, height, seed)
+    levels                    Array of per-level configs (width, height, and
+                              seed for level 1)
+
+Level width and height are clamped to the supported range of 7 through 100.
+The seed in the first level config generates level 1 (default 42).
+Subsequent levels are generated with random seeds.
 
 See config.json for a working example.
